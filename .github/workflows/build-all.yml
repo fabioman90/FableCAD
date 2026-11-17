@@ -3,10 +3,11 @@ on:
   push:
     branches:
       - master
-  # Check macOS and Windows ARM64 packaging before changes reach master.
+  # Check desktop packaging and startup changes before changes reach master.
   pull_request:
     paths:
       - '.github/workflows/build-all.yml'
+      - 'librecad/src/main/main.cpp'
       - 'scripts/*osx*'
       - 'scripts/*macos*'
       - 'scripts/postprocess-windows/nsis-msvc.nsi'
@@ -257,7 +258,7 @@ jobs:
           retention-days: 2
 
   BuildWindows64:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: windows-2022
     outputs:
       output1: ${{ steps.artifact-upload-step.outputs.artifact-id }}
