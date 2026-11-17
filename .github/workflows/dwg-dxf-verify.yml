@@ -175,6 +175,47 @@ jobs:
       - name: Run bounded DWG/DXF test lanes
         run: ctest --test-dir format-tests --output-on-failure
 
+  VerifyDwgDxfMacOS:
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@main
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.9.*'
+          modules: 'qt5compat'
+          arch: 'clang_64'
+
+      - name: Install test dependencies
+        run: brew install boost ninja muparser openssl@3 freetype icu4c
+
+      - name: Configure bounded DWG/DXF test lanes
+        run: |
+          cmake -S . -B format-tests -G Ninja \
+            -DBUILD_TESTS=ON \
+            -DLIBRECAD_ENABLE_OPENTYPE=OFF \
+            -DLIBDXFRW_BUILD_DOC=OFF \
+            -DLIBRECAD_REGISTER_INTEGRATION_TESTS=ON \
+            -DLIBRECAD_REGISTER_FULL_TESTS=OFF \
+            -DLIBRECAD_REGISTER_FORMAT_TESTS=OFF \
+            -DLIBRECAD_REGISTER_CROSS_READ_SMOKE=OFF
+
+      - name: Build bounded DWG/DXF test lanes
+        run: |
+          cmake --build format-tests \
+            --target librecad_dwg_fast_tests librecad_dxf_fast_tests librecad_lc_consolesvgexporttests librecad_painter_tests \
+              libdxfrw_dxf_embedded_scope_tests libdxfrw_verified_write_tests librecad_text_native_tests \
+              librecad_dimension_clipboard_tests librecad_hatch_tests librecad_linetype_ui_tests \
+            --parallel 3
+
+      - name: Run bounded DWG/DXF test lanes
+        run: ctest --test-dir format-tests --output-on-failure
+
   VerifyDwgDxfWindows:
     strategy:
       fail-fast: false
