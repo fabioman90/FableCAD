@@ -416,6 +416,7 @@ int main(int argc, char** argv) {
     const auto versionStr = XSTR(LC_VERSION);
 
     LC_Application app(argc, argv);
+    QGuiApplication::setApplicationDisplayName(QStringLiteral("FableCAD"));
     QCoreApplication::setOrganizationName("LibreCAD");
     // Application name is "LibreCAD-<schemaMajor>" so each major release
     // line gets its own QSettings backing store. RS_Settings::init() picks
