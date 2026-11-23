@@ -71,7 +71,7 @@ int runPdfCommand(int argc, char* argv[], const PdfCommandSpec& spec) {
     QApplication app(normalizedArgc, normalizedArgv);
     QCoreApplication::setOrganizationName("LibreCAD");
     QCoreApplication::setApplicationName("LibreCAD");
-    QCoreApplication::setApplicationVersion(XSTR(LC_VERSION));
+    QCoreApplication::setApplicationVersion(LCVersion());
 
     RS_Settings::init(app.organizationName(), app.applicationName());
     RS_SYSTEM->init(app.applicationName(), app.applicationVersion(), XSTR(QC_APPDIR),

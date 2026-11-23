@@ -409,7 +409,7 @@ const LC_CommandItem g_commandList[] = {
         // draw circle tangential to 2 circles and 1 point - v2.2.0r2
         {
             {{"circletan2cp", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "circletan2cp", "circle 2 tangent point")}},
-            {{"tr", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "tr", "circle 2 tangent point")}},
+            {{"ct2", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "ct2", "circle 2 tangent point")}},
             RS2::ActionDrawCircleTangental2Entities1Point
         },
         // draw circle Tangential to 2 Points - v2.2.0r2
@@ -790,7 +790,8 @@ const LC_CommandItem g_commandList[] = {
         {
             {{"trim", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "trim", "modify - trim (extend)")}},
             {{"modtrim", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "modtrim", "modify - trim (extend)")},
-             {"tm", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "tm", "modify - trim (extend)")}},
+             {"tm", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "tm", "modify - trim (extend)")},
+             {"tr", LC_CommandText QT_TRANSLATE_NOOP3("QObject", "tr", "modify - trim (extend)")}},
             RS2::ActionModifyTrim
         },
         // trim2

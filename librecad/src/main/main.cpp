@@ -76,11 +76,6 @@
 #include <windows.h>
 #endif
 
-// default version: if not supplied by during building
-#ifndef LC_VERSION
-#define LC_VERSION "2.2.2-alpha"
-#endif
-
 // The application directory name is stringified, so a quoted value (#3003)
 // would put the quotes into every resource path.
 static_assert(XSTR(QC_APPDIR)[0] != '"', "define QC_APPDIR without quotes");
@@ -88,10 +83,6 @@ static_assert(XSTR(QC_APPDIR)[0] != '"', "define QC_APPDIR without quotes");
 // fixme - sand - files - complete refactoring
 namespace
 {
-// To a plain text string to the compiled binary
-const std::string g_lcVersion{"LC_VISION=" XSTR(LC_VERSION)};
-
-// update splash for alpha/beta names)
     void updateSplash(const std::unique_ptr<QSplashScreen>& splash);
 
 #ifdef Q_OS_WIN
@@ -161,8 +152,7 @@ void showFirstLoadSetupDialog(const bool firstLoad) {
         if (firstLoad){
             RS_DEBUG->print("main: show initial config dialog..");
             QG_DlgInitial di(nullptr);
-            const QPixmap pxm(":/images/intro_librecad.png");
-            di.setPixmap(pxm);
+            di.setPixmap(QIcon(":/images/fablecad.svg").pixmap(QSize(128, 128)));
             if (di.exec() != 0) {
                 QString unit = LC_GET_STR("Unit", "Invalid"); // fixme - sand - what for? review
                 unit = LC_GET_STR("Unit", "None");
@@ -413,10 +403,11 @@ int main(int argc, char** argv) {
 #endif
 
 
-    const auto versionStr = XSTR(LC_VERSION);
+    const auto versionStr = LCVersion();
 
     LC_Application app(argc, argv);
     QGuiApplication::setApplicationDisplayName(QStringLiteral("FableCAD"));
+    app.setWindowIcon(QIcon(":/images/fablecad.svg"));
     QCoreApplication::setOrganizationName("LibreCAD");
     // Application name is "LibreCAD-<schemaMajor>" so each major release
     // line gets its own QSettings backing store. RS_Settings::init() picks
@@ -508,7 +499,7 @@ int main(int argc, char** argv) {
     showFirstLoadSetupDialog(first_load);
 
     std::unique_ptr<QSplashScreen> splash;
-    const bool show_splash = LC_GET_ONE_BOOL("Startup","ShowSplash", true);
+    const bool show_splash = LC_GET_ONE_BOOL("Startup","ShowSplash", false);
 
     if (show_splash){
         splash = std::make_unique<QSplashScreen>();
@@ -531,11 +522,11 @@ int main(int argc, char** argv) {
     app.installEventFilter(&appWin);
 #endif
     RS_DEBUG->print("main: setting caption");
-    QString mainWinTitle = applicationName;
+    QString mainWinTitle = app.applicationDisplayName();
 
     const bool showVersionInTitle = LC_GET_ONE_BOOL("Startup","ShowVersionInTitle", true);
     if (showVersionInTitle) {
-        mainWinTitle = applicationName + " [" + versionStr + "]";
+        mainWinTitle = QStringLiteral("%1 [%2]").arg(mainWinTitle, QString::fromLatin1(versionStr));
     }
 
     appWin.setWindowTitle(mainWinTitle);
@@ -578,7 +569,7 @@ int main(int argc, char** argv) {
     if (splash != nullptr){
         RS_DEBUG->print("main: updating splash");
         splash->raise();
-        splash->showMessage(QObject::tr("Loading..."), Qt::AlignRight|Qt::AlignBottom, Qt::black);
+        splash->showMessage(QObject::tr("Loading..."), Qt::AlignRight | Qt::AlignBottom, QColor("#d4e8eb"));
         RS_DEBUG->print("main: processing events");
         qApp->processEvents();
         RS_DEBUG->print("main: updating splash: OK");
@@ -596,22 +587,12 @@ int main(int argc, char** argv) {
 
     if (splash != nullptr) {
         splash->finish(&appWin);
-        splash.release();
+        splash.reset();
     }
 
-    LC_GROUP("Startup");
-    {
-        // fixme - sand - files - add support of command line flag to suppress version check (may be useful for automation)!
-        const bool checkForNewVersion = LC_GET_BOOL("CheckForNewVersions", true);
-        if (checkForNewVersion) {
-            appWin.checkForNewVersion();
-        }
-
-        if (first_load){
-            LC_SET("FirstLoad", false);
-        }
+    if (first_load) {
+        LC_SET_ONE("Startup", "FirstLoad", false);
     }
-    LC_GROUP_END();
 
     return execApplication(app);
 #    endif
@@ -652,48 +633,22 @@ QStringList handleArgs(const int argc, char** argv, const QList<int>& argClean){
 }
 
 namespace {
+void updateSplash(const std::unique_ptr<QSplashScreen>& splash) {
+    QPixmap artwork(880, 352);
+    artwork.setDevicePixelRatio(2);
+    artwork.fill(QColor("#182431"));
 
-// Update Splash image to show "ALPHA", "BETA", and "Release Candidate"
-QPixmap getSplashImage(const std::unique_ptr<QSplashScreen>& splash, const QString& label);
-// Update Splash Screen
-    void updateSplash(const std::unique_ptr<QSplashScreen>& splash) {
-        if (splash == nullptr) {
-            return;
-        }
+    QPainter painter(&artwork);
+    painter.drawPixmap(31, 42, QIcon(":/images/fablecad.svg").pixmap(QSize(92, 92), 2));
+    painter.setPen(QColor("#edf8f9"));
+    QFont font = painter.font();
+    font.setPixelSize(35);
+    font.setWeight(QFont::DemiBold);
+    painter.setFont(font);
+    painter.drawText(QRect(129, 46, 280, 84), Qt::AlignVCenter, QGuiApplication::applicationDisplayName());
+    painter.end();
 
-    const QString label = LCReleaseLabel();
-        if (label.isEmpty()) {
-            return;
-        }
-
-        const QPixmap splashImage = getSplashImage(splash, label);
-        splash->setPixmap(splashImage);
-        splash->setAttribute(Qt::WA_DeleteOnClose);
-        splash->show();
-        splash->showMessage(QObject::tr("Loading.."),
-                            Qt::AlignRight|Qt::AlignBottom, Qt::black);
-    }
-
-// Update Splash image to show "ALPHA", "BETA", and "Release Candidate"
-    QPixmap getSplashImage(const std::unique_ptr<QSplashScreen>& splash, const QString& label)    {
-        if (splash == nullptr) {
-            return {};
-        }
-
-        auto splashFileName = ":/images/splash_librecad.png";
-        if (LC_IconColorsOptions::isDarkColorScheme()) {
-            splashFileName = ":/images/splash_librecad_dark.svg";
-        }
-        QPixmap pixmapSplash(splashFileName);
-        QPainter painter(&pixmapSplash);
-        const double factorX = pixmapSplash.width()/542.;
-        const double factorY = pixmapSplash.height()/337.;
-        painter.setPen(QColor(255, 0, 0, 128));
-        const QRectF labelRect{QPointF{280.*factorX, 130.*factorY}, QPointF{480.*factorX, 170.*factorY}};
-        QFont font;
-        font.setPixelSize(static_cast<int>(labelRect.height()) - 2);
-        painter.setFont(font);
-        painter.drawText(labelRect,Qt::AlignRight, label);
-        return pixmapSplash;
-    }
+    splash->setPixmap(artwork);
+    splash->show();
+}
 }

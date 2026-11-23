@@ -1997,6 +1997,11 @@ public:
     OwnerMismatch
   };
 
+  // Experimental DWG comparison exports the original layer table while tracking
+  // newly created layers independently of changes in the rest of the drawing.
+  static bool exportLayerSubset(RS_Graphic& graphic, const QString& path,
+                                const std::vector<RS_Layer*>& layers);
+
   RS_FilterDXFRW();
   ~RS_FilterDXFRW() override;
   RS_FilterDXFRW(const RS_FilterDXFRW &) = delete;

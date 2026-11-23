@@ -38,6 +38,9 @@ struct LC_LayersExportOptions;
     This service class centralizes the file I/O user interface.
 */
 namespace LC_FileDialogService {
+#ifdef DWGSUPPORT
+    inline constexpr char dwg2018NameFilter[] = "AutoCAD 2020 – DWG R2018 (*.dwg)";
+#endif
     enum FileDialogMode {
         SaveDrawing = 0,
         ExportLayersSelected = 1,
@@ -60,5 +63,8 @@ namespace LC_FileDialogService {
     FileDialogResult getFileDetails(FileDialogMode fileDialogMode,
                                     const QString &currentFileName = QString{},
                                     RS2::FormatType preferredType = RS2::FormatUnknown);
+    FileDialogResult getFileDetails(FileDialogMode fileDialogMode, const QString& currentFileName,
+                                    RS2::FormatType preferredType, RS2::FormatType originalType,
+                                    const QString& originalFilter);
 }
 #endif

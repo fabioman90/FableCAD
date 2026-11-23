@@ -1983,7 +1983,7 @@
           <item row="3" column="0">
            <widget class="QCheckBox" name="dbDimEmbeddArrowBlocks">
             <property name="toolTip">
-             <string>If checked, used non-default arrow blocks will be added during drawing's saving. Embedding arrow blocks is needed for drawings that are later opened in AutoCAD.  This check may be unset if all editing is performed in LibreCAD. </string>
+             <string>If checked, used non-default arrow blocks will be added during drawing's saving. Embedding arrow blocks is needed for drawings that are later opened in AutoCAD.  This check may be unset if all editing is performed in FableCAD. </string>
             </property>
             <property name="text">
              <string>Embed arrows blocks on save</string>

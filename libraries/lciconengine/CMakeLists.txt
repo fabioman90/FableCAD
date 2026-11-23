@@ -11,7 +11,13 @@ qt_add_plugin(
 )
 
 #qt_add_translations(${PLUGIN_NAME} TS_FILE_DIR ../ts TS_FILES ${PLUGIN_TS_FILES})
-install(TARGETS ${PLUGIN_NAME} BUNDLE DESTINATION bin LIBRARY DESTINATION bin/iconengines)
+if(APPLE)
+    install(TARGETS ${PLUGIN_NAME}
+        LIBRARY DESTINATION bin/FableCAD.app/Contents/PlugIns/iconengines
+        COMPONENT Resources)
+else()
+    install(TARGETS ${PLUGIN_NAME} BUNDLE DESTINATION bin LIBRARY DESTINATION bin/iconengines)
+endif()
 
 set_target_properties(
         ${PLUGIN_NAME}

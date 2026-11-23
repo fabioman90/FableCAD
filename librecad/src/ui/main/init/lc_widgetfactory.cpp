@@ -381,8 +381,7 @@ void LC_WidgetFactory::createRightSidebar(QG_ActionHandler* actionHandler){
     m_appWin->tabifyDockWidget(dock_quick_info, dock_property_sheet);
     m_appWin->tabifyDockWidget(dock_property_sheet, dock_ucss);
     m_appWin->tabifyDockWidget(dock_ucss, dock_views);
-    // Below the tabs, so that the Command Line and the Layer List are both shown (as in 2.2.x)
-    m_appWin->addDockWidget(Qt::RightDockWidgetArea, dock_command, Qt::Vertical);
+    m_appWin->addDockWidget(Qt::BottomDockWidgetArea, dock_command);
     dock_layer->raise();
 
     updateDockWidgetsTitleBarType(m_appWin, verticalTitle);

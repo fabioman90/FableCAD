@@ -108,6 +108,7 @@
 #include "rs_dimradial.h"
 #include "rs_ellipse.h"
 #include "rs_filterdxfrw.h"
+#include "rs_fileio.h"
 #include "rs_graphicview.h"
 #include "rs_hatch.h"
 #include "rs_image.h"
@@ -4145,7 +4146,7 @@ QString RS_FilterDXFRW::lastError() const {
   case DRW::BAD_VERSION:
     if (m_dwgVersion != DRW::UNKNOWNV) {
       return QObject::tr(
-                 "Cannot open DWG: file is %1; LibreCAD supports %2 and newer. "
+                 "Cannot open DWG: file is %1; FableCAD supports %2 and newer. "
                  "Convert with GNU LibreDWG (dwgread / dwg2dxf) or re-save "
                  "from a recent CAD tool.",
                  "RS_FilterDXFRW")
@@ -4446,6 +4447,26 @@ bool RS_FilterDXFRW::fileImport(RS_Graphic &g, const QString &file,
       return false;
     }
     m_graphic->dwgAdvancedMetadata().markVportsImported();
+    // Model-space leaders can refer to a block read later in the file.
+    const auto resolveLeaderBlocks = [this](RS_EntityContainer &container) {
+      for (auto *entity : lc::LC_ContainerTraverser{container, RS2::ResolveNone}.entities()) {
+        if (!entity || entity->rtti() != RS2::EntityMLeader)
+          continue;
+        auto *leader = static_cast<LC_MLeader *>(entity);
+        const auto &data = leader->getData();
+        if (data.hasBlockContents && data.blockName.isEmpty()) {
+          const auto *block = dynamic_cast<const RS_Block *>(
+              m_blockHash.value(data.dwgBlockHandle));
+          if (block != nullptr)
+            leader->setResolvedBlockName(block->getName());
+        }
+      }
+    };
+    resolveLeaderBlocks(*m_graphic);
+    for (unsigned i = 0; i < m_graphic->countBlocks(); ++i) {
+      if (auto *block = m_graphic->blockAt(i); block && !block->isDeleted())
+        resolveLeaderBlocks(*block);
+    }
   } else {
 #endif
 
@@ -4555,7 +4576,7 @@ bool RS_FilterDXFRW::fileImport(RS_Graphic &g, const QString &file,
                       "INSERTed into modelspace. Their externally-referenced "
                       "geometry won't be visible — AutoCAD typically renders "
                       "these through a paper-space layout viewport, which "
-                      "LibreCAD doesn't render.")
+                      "FableCAD doesn't render.")
               .arg(orphans.size())
               .arg(orphans.join(QStringLiteral(", "))));
     }
@@ -8411,6 +8432,8 @@ bool RS_FilterDXFRW::addTableFallback(const DRW_Table &data,
                        int column) {
     auto *line = new RS_Line{m_currentContainer, {a, b}};
     setEntityAttributes(line, &data);
+    // These display primitives are generated from the table, not DWG frames.
+    line->setSourceHandle(DRW::NoHandle);
     line->update();
     addFallbackRecord(line, row, column,
                       LC_DwgAdvancedMetadata::TableFallbackRole::GridLine);
@@ -8473,6 +8496,7 @@ bool RS_FilterDXFRW::addTableFallback(const DRW_Table &data,
                             1.0, text, style, angle, RS2::NoUpdate);
       auto *mtext = new RS_MText(m_currentContainer, textData);
       setEntityAttributes(mtext, &data);
+      mtext->setSourceHandle(DRW::NoHandle);
       mtext->update();
       addFallbackRecord(
           mtext, static_cast<int>(row), static_cast<int>(column),
@@ -10665,9 +10689,9 @@ void RS_FilterDXFRW::addMLeader(const DRW_MLeader *data) {
   md.dwgTextStyleHandle = data->styleTextStyleHandle.ref != 0
                               ? data->styleTextStyleHandle.ref
                               : data->context.textStyleHandle.ref;
-  md.dwgBlockHandle = data->styleBlockHandle.ref != 0
-                          ? data->styleBlockHandle.ref
-                          : data->context.blockTableRecordHandle.ref;
+  md.dwgBlockHandle = data->context.blockTableRecordHandle.ref != 0
+                          ? data->context.blockTableRecordHandle.ref
+                          : data->styleBlockHandle.ref;
 
   auto m = std::make_unique<LC_MLeader>(m_currentContainer, std::move(md));
   setEntityAttributes(m.get(), data);
@@ -13376,7 +13400,47 @@ void RS_FilterDXFRW::writeBlocks() {
       return;
     }
 
+    // DWG dimensions refer to an anonymous block containing their plotted
+    // geometry. The editor regenerates that geometry when dimensions change.
+    prepareBlocks();
+    std::vector<std::pair<RS_EntityContainer *, std::uint32_t>> dimensionBlocks;
+    for (RS_Entity *entity :
+         lc::LC_ContainerTraverser{*m_graphic, RS2::ResolveNone}.entities()) {
+      const auto name = m_noNameBlock.constFind(entity);
+      if (name == m_noNameBlock.constEnd() || entity->rtti() == RS2::EntityDimLeader)
+        continue;
+      const auto handle = m_dwgW->defineBlock(name.value().toStdString(), DRW_Coord{}, 0);
+      if (!handle) {
+        rollbackBlockPhase();
+        return;
+      }
+      dimensionBlocks.emplace_back(static_cast<RS_EntityContainer *>(entity), handle);
+    }
+
     prepareDwgEntityHandleMap();
+
+    for (const auto &[dimension, handle] : dimensionBlocks) {
+      if (!m_dwgW->beginBlockContent(handle)) {
+        rollbackBlockPhase();
+        return;
+      }
+      for (RS_Entity *component :
+           lc::LC_ContainerTraverser{*dimension, RS2::ResolveNone}.entities()) {
+        if (component->isAlive() && !writeDimArcSymbolAsArc(component)) {
+          writeEntity(component);
+          if (m_writeFailed) {
+            RS_DEBUG->print(RS_Debug::D_WARNING,
+                "DWG dimension block 0x%X: could not encode component type %d",
+                handle, static_cast<int>(component->rtti()));
+            break;
+          }
+        }
+      }
+      if (m_writeFailed || !m_dwgW->endBlockContent()) {
+        rollbackBlockPhase();
+        return;
+      }
+    }
 
     for (const auto &blockHandle : blockHandles) {
       RS_Block *blk = blockHandle.first;
@@ -16419,6 +16483,11 @@ bool RS_FilterDXFRW::prepareDwgFieldWritePlan() {
         !plan.fieldCandidateIndexes
              .emplace(record.handle, plan.fieldCandidates.size())
              .second) {
+      RS_DEBUG->print(RS_Debug::D_WARNING,
+                      "RS_FilterDXFRW: cannot write DWG FIELD 0x%X (complete=%d, valid=%d, source=%d)",
+                      record.handle, record.typedPayloadComplete,
+                      candidate.payload.isDwgPayloadValid(plan.version),
+                      static_cast<int>(candidate.sourceAuthorization));
       plan.valid = false;
       break;
     }
@@ -17110,6 +17179,25 @@ RS2::FormatType RS_FilterDXFRW::formatForDwgVersion(const DRW::Version version) 
 
 QString RS_FilterDXFRW::exportReport() const {
   QStringList lines;
+#ifdef DWGSUPPORT
+  if (m_dwgFieldWritePlan.frozen && !m_dwgFieldWritePlan.valid) {
+    lines << QObject::tr("Some DWG fields or field references could not be preserved.",
+                         "RS_FilterDXFRW");
+  }
+  if (m_dwgExportAdmissionPlan.frozen && !m_dwgExportAdmissionPlan.valid) {
+    const auto &records = m_dwgExportAdmissionPlan.records;
+    const auto refusal = std::find_if(records.cbegin(), records.cend(),
+        [](const DwgExportAdmissionRecord &record) {
+          return record.policy == DwgExportAdmissionPolicy::Refuse &&
+                 record.family == DwgExportAdmissionFamily::OpaqueTable;
+        });
+    if (refusal != records.cend()) {
+      return QObject::tr("This DWG contains table data that FableCAD cannot preserve (%1). "
+                         "Save a DXF copy to keep working on the drawing.", "RS_FilterDXFRW")
+          .arg(QString::fromStdString(refusal->normalizedName));
+    }
+  }
+#endif
   if (m_dxfLeftOutRawRecords > 0) {
     lines << QObject::tr("%1 object(s) read from another DXF version, which "
                          "this version cannot hold", "RS_FilterDXFRW")
@@ -17958,6 +18046,9 @@ bool RS_FilterDXFRW::prepareDwgEntityWritePlans() {
                          DwgFixedEntityRoute fixed, std::uint16_t frameType) {
     if (entity == nullptr || entity->sourceHandle() == 0 || frameType == 0 ||
         m_dwgWriteDuplicateEntityHandles.count(entity->sourceHandle()) != 0) {
+      RS_DEBUG->print(RS_Debug::D_WARNING,
+                      "RS_FilterDXFRW: no unique DWG entity frame for handle 0x%X",
+                      entity == nullptr ? 0 : entity->sourceHandle());
       return false;
     }
     const auto entityIt = m_dwgWriteEntityHandleByEntity.find(entity);
@@ -17981,8 +18072,14 @@ bool RS_FilterDXFRW::prepareDwgEntityWritePlans() {
         const auto *mleader = static_cast<const LC_MLeader *>(entity);
         const DwgMLeaderWriteRoute route =
             selectDwgMLeaderWriteRoute(mleader->getData(), version);
-        if (route == DwgMLeaderWriteRoute::Invalid)
+        if (route == DwgMLeaderWriteRoute::Invalid) {
+          const auto &data = mleader->getData();
+          RS_DEBUG->print(RS_Debug::D_WARNING,
+                          "RS_FilterDXFRW: invalid DWG multileader 0x%X (text=%d empty=%d block=%d block-handle=0x%X content=%d leader=%d)",
+                          entity->sourceHandle(), data.hasTextContents, data.textLabel.isEmpty(),
+                          data.hasBlockContents, data.dwgBlockHandle, data.contentType, data.leaderType);
           return false;
+        }
         if (route == DwgMLeaderWriteRoute::Native &&
             (mleaderClassNumber < 500 ||
              !stage(entity, DwgEntityWritePlanRoute::CustomSingleFrame,
@@ -18110,8 +18207,13 @@ bool RS_FilterDXFRW::admitDwgEntityWritePlans() {
           m_dwgW->registerDwgEntityClassInstance(plan.expectedFrameType,
                                                  plan.outputHandle);
     }
-    if (!admitted || !admitDwgEntityWritePlan(plan.entity))
+    if (!admitted || !admitDwgEntityWritePlan(plan.entity)) {
+      RS_DEBUG->print(RS_Debug::D_WARNING,
+                      "RS_FilterDXFRW: DWG entity frame 0x%X -> 0x%X (type %u) was refused",
+                      plan.sourceHandle, plan.outputHandle,
+                      static_cast<unsigned>(plan.expectedFrameType));
       return false;
+    }
   }
   return true;
 }
@@ -19994,13 +20096,26 @@ void RS_FilterDXFRW::writeLTypes() {
   }
 }
 
+namespace {
+thread_local const std::vector<RS_Layer*>* projectedLayers = nullptr;
+}
+
+bool RS_FilterDXFRW::exportLayerSubset(RS_Graphic& graphic, const QString& path,
+                                      const std::vector<RS_Layer*>& layers) {
+  const auto* previous = projectedLayers;
+  const auto restore = qScopeGuard([&] { projectedLayers = previous; });
+  projectedLayers = &layers;
+  return RS_FileIO::instance()->fileExport(graphic, path, RS2::FormatDXFRW2018);
+}
+
 void RS_FilterDXFRW::writeLayers() {
   DRW_Layer lay;
   RS_LayerList *ll = m_graphic->getLayerList();
   int exact_rgb;
-  for (unsigned int i = 0; i < ll->count(); i++) {
+  const auto size = projectedLayers ? projectedLayers->size() : ll->count();
+  for (size_t i = 0; i < size; i++) {
     lay.reset();
-    RS_Layer *l = ll->at(i);
+    RS_Layer *l = projectedLayers ? projectedLayers->at(i) : ll->at(i);
     RS_Pen pen = l->getPen();
     lay.name = l->getName().toUtf8().data();
     lay.color = LC_ColorNumbers::colorToNumber(pen.getColor(), &exact_rgb);
@@ -20987,6 +21102,11 @@ void RS_FilterDXFRW::writeDimstyles() {
     }
     if (m_dwgW) {
       const std::uint32_t sourceHandle = dst.handle;
+      dst.applyVariablesForDwg();
+      dst.dimtxstyH.ref = dwgWriteHandleByName(m_dwgWriteTextStyleHandleByName,
+                                               ds->text()->style().toStdString());
+      if (!dst.dimtxstyH.ref)
+        dst.dimtxstyH.ref = DRW::DwgStandardTextStyleHandle;
       if (!m_dwgW->addDimstyle(&dst) ||
           !stageDwgTableRecordIdentity(DwgWriteSourceKind::TableRecord,
                                        sourceHandle, dst.handle))
@@ -22242,9 +22362,20 @@ void RS_FilterDXFRW::writeObjects() {
                   entry.m_handle);
               continue;
             }
+            DwgWriteSourceKind targetKind = DwgWriteSourceKind::Object;
+            std::uint32_t targetHandle = 0;
+            if (lookupDwgWriteIdentity(DwgWriteSourceKind::Object, entry.m_handle) ==
+                DwgWriteIdentityLookup::Missing) {
+              const auto rawStatus = lookupDwgWriteIdentity(
+                  DwgWriteSourceKind::RawCarrier, entry.m_handle, &targetHandle);
+              if ((rawStatus == DwgWriteIdentityLookup::Selected ||
+                   rawStatus == DwgWriteIdentityLookup::Committed) &&
+                  targetHandle == outputHandle)
+                targetKind = DwgWriteSourceKind::RawCarrier;
+            }
             if (!recordRetainedReference(
                     entry.m_handle, outputHandle,
-                    DwgWriteSourceKind::Object, "DICTIONARY entry",
+                    targetKind, "DICTIONARY entry",
                     static_cast<std::uint32_t>(ordinal),
                     dictionary.dwgItemHandleCode(), true))
               return false;
@@ -30869,7 +31000,8 @@ void RS_FilterDXFRW::writeEntity(RS_Entity *e) {
       primitive->setLayer(layer);
       writeEntity(primitive.get());
     }
-    break;
+    // Each primitive commits its own frame. The arrow has no separate DWG record.
+    return;
   }
     //    case RS2::EntityVertex:
     //        break;
@@ -32486,7 +32618,7 @@ void RS_FilterDXFRW::writeDimension(RS_Dimension *d) {
     dd->setDef2Point(
         DRW_Coord(dl->getExtensionPoint2().x, dl->getExtensionPoint2().y, 0.0));
     dd->setAngle(RS_Math::rad2deg(dl->getAngle()));
-    dd->setOblique(dl->getOblique());
+    dd->setOblique(RS_Math::rad2deg(dl->getOblique()));
     break;
   }
   }
@@ -34649,7 +34781,7 @@ void RS_FilterDXFRW::printDwgError(int le) {
       const QString actual = dwgVersionDisplay(m_dwgVersion);
       RS_DIALOGFACTORY->commandMessage(
           QObject::tr(
-              "Cannot open DWG: file is %1; LibreCAD supports %2 and "
+              "Cannot open DWG: file is %1; FableCAD supports %2 and "
               "newer. "
               "Convert with GNU LibreDWG (dwgread / dwg2dxf) or re-save "
               "from a recent CAD tool.")

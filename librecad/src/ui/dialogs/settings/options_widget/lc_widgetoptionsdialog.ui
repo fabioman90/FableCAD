@@ -27,7 +27,7 @@
   </property>
   <property name="windowIcon">
    <iconset resource="../../../../../res/images/images.qrc">
-    <normaloff>:/images/librecad.png</normaloff>:/images/librecad.png</iconset>
+    <normaloff>:/images/fablecad.svg</normaloff>:/images/fablecad.svg</iconset>
   </property>
   <layout class="QGridLayout" name="gridLayout_4">
    <item row="9" column="0" colspan="2">

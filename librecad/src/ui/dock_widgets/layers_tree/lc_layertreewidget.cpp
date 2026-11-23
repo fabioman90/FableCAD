@@ -107,7 +107,7 @@ LC_LayerTreeView *LC_LayerTreeWidget::initTreeView(){
     treeView->setColumnWidth(LC_LayerTreeModel::COLUMN_COLOR_SAMPLE, itemHeight);
 
     treeView->setUniformRowHeights(true);
-    treeView->setAlternatingRowColors(false);
+    treeView->setAlternatingRowColors(true);
     treeView->setSelectionMode(QAbstractItemView::NoSelection);
     treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     treeView->setFocusPolicy(Qt::NoFocus);
@@ -121,10 +121,6 @@ LC_LayerTreeView *LC_LayerTreeWidget::initTreeView(){
     treeView->setExpandsOnDoubleClick(false);
 
     treeView->setContextMenuPolicy(Qt::CustomContextMenu);
-
-#ifndef DONT_FORCE_WIDGETS_CSS
-    treeView->setStyleSheet("QWidget {background-color: white;}  QScrollBar{ background-color: none }");
-#endif
 
     connect(treeView, &QTreeView::customContextMenuRequested, this, &LC_LayerTreeWidget::onCustomContextMenu);
     connect(treeView, &QTreeView::clicked, this, &LC_LayerTreeWidget::slotTreeClicked);
@@ -1800,7 +1796,7 @@ void LC_LayerTreeWidget::makeLayerEntitiesVisible(const RS_Layer* layer, const Q
     }
 
     const QString message = tr("Make %1 individually invisible model/paper-space entities on layer \"%2\" visible?\n\n"
-                               "This can recover drawings saved by LibreCAD 2.2.1, but it will also reveal entities "
+                               "This can recover drawings saved by earlier versions of the drawing engine, but it will also reveal entities "
                                "that were intentionally hidden.")
                                 .arg(entities.size())
                                 .arg(layer->getName());

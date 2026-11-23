@@ -31,6 +31,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QPixmapCache>
+#include <QRegularExpression>
 #include <QStyleOption>
 #include <QSvgRenderer>
 
@@ -146,7 +147,7 @@ public:
     void checkFileOverrideForAnyMode(const QString& baseName, QIcon::Mode mode, QIcon::State state, FileType fileType);
 
     QString getColorForReplacement(const QString& baseKey, QIcon::Mode mode, QIcon::State state);
-    QString replaceColor(QString content, const QString& baseColorKey, QIcon::Mode mode, QIcon::State state, const QString& originalColor);
+    QString replaceTemplateColors(const QString& content, QIcon::Mode mode, QIcon::State state);
 
     QHash<int, LC_SvgFileInfo*> svgFiles;
     QHash<int, QPixmap> *addedPixmaps;
@@ -344,12 +345,6 @@ QSize LC_SVGIconEngine::actualSize(const QSize &size, const QIcon::Mode mode, co
     return pm.size();
 }
 
-namespace {
-    constexpr auto TEMPLATE_COLOR_MAIN = "#000";
-    constexpr auto TEMPLATE_COLOR_ACCENT = "#00ff7f";
-    constexpr auto TEMPLATE_COLOR_BACKGROUND_FILL = "#fff";
-}
-
 QString LC_SvgIconEnginePrivate::getColorForReplacement(const QString& baseKey, const QIcon::Mode mode, const QIcon::State state){
     // first, try to find the most exact replacement color that includes mode and state
 
@@ -363,12 +358,33 @@ QString LC_SvgIconEnginePrivate::getColorForReplacement(const QString& baseKey, 
     return result;
 }
 
-QString LC_SvgIconEnginePrivate::replaceColor(QString content, const QString& baseColorKey, const QIcon::Mode mode, const QIcon::State state, const QString& originalColor){
-    const QString color = getColorForReplacement(baseColorKey, mode, state);
-    if (!color.isEmpty()  && color != originalColor) {
-        content = content.replace(originalColor, color);
+QString LC_SvgIconEnginePrivate::replaceTemplateColors(const QString& content,
+                                                      QIcon::Mode mode, QIcon::State state) {
+    const QString main = getColorForReplacement(LC_SVGIconEngineAPI::KEY_COLOR_MAIN, mode, state);
+    const QString accent = getColorForReplacement(LC_SVGIconEngineAPI::KEY_COLOR_ACCENT, mode, state);
+    const QString background = getColorForReplacement(LC_SVGIconEngineAPI::KEY_COLOR_BG, mode, state);
+
+    // Match complete color tokens from the original SVG. This handles both
+    // lengths of black and white and never rewrites a color already inserted.
+    static const QRegularExpression templateColor(
+        QStringLiteral(R"((?:(#000(?:000)?)|(#00ff7f)|(#fff(?:fff)?))(?![0-9a-f]))"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QStringView source(content);
+    QString result;
+    result.reserve(content.size());
+    qsizetype offset = 0;
+    auto matches = templateColor.globalMatch(content);
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        result += source.mid(offset, match.capturedStart() - offset);
+        const QString& color = match.capturedStart(1) >= 0 ? main
+                             : match.capturedStart(2) >= 0 ? accent : background;
+        result += color.isEmpty() ? match.capturedView(0) : QStringView(color);
+        offset = match.capturedEnd();
     }
-    return content;
+    result += source.mid(offset);
+    return result;
 }
 
 bool LC_SvgIconEnginePrivate::tryLoad(QSvgRenderer *renderer, const QIcon::Mode mode, const QIcon::State state){
@@ -384,13 +400,7 @@ bool LC_SvgIconEnginePrivate::tryLoad(QSvgRenderer *renderer, const QIcon::Mode 
                 QFile file(fileInfo->fileName);
                 if (file.open(QFile::ReadOnly | QFile::Text)) {
                     QTextStream in(&file);
-                    QString content = in.readAll();
-
-                    content = replaceColor(content, LC_SVGIconEngineAPI::KEY_COLOR_MAIN, mode, state, TEMPLATE_COLOR_MAIN);
-                    content = replaceColor(content, LC_SVGIconEngineAPI::KEY_COLOR_ACCENT, mode, state, TEMPLATE_COLOR_ACCENT);
-                    content = replaceColor(content, LC_SVGIconEngineAPI::KEY_COLOR_BG, mode, state, TEMPLATE_COLOR_BACKGROUND_FILL);
-
-                    const QByteArray byteArrayContent = content.toUtf8();
+                    const auto byteArrayContent = replaceTemplateColors(in.readAll(), mode, state).toUtf8();
                     renderer->load(byteArrayContent);
                     colorsReplaced = true;
                     return true;

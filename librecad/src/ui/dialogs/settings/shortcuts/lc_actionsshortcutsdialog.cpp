@@ -147,7 +147,7 @@ bool LC_ActionsShortcutsDialog::obtainFileName(QString& fileName, const bool for
     const QString defFileName = dir + "/shortcuts.lcs";
     return LC_FileNameSelectionService::doObtainFileName(this, fileName, forRead, "lcs",
         defFileName, tr("Import shortcuts mapping"),
-        tr("Export shortcuts mapping"), tr("LibreCAD Shortcuts file (*.%1)"));
+        tr("Export shortcuts mapping"), tr("FableCAD shortcuts file (*.%1)"));
 }
 
 void LC_ActionsShortcutsDialog::onImportClicked() {
@@ -189,7 +189,7 @@ void LC_ActionsShortcutsDialog::reportLoadResult(const int loadResult) const {
         case LC_ShortcutsStorage::ERROR_WRONG_DTD: {
             showIOInfoDialog(true, false, tr(
                                  "Shortcuts mappings were not imported.\n\n "
-                                 "Provided file does exists, however it does not contain LibreCAD shortcuts mapping."));
+                                 "The file does not contain a FableCAD shortcut mapping."));
             break;
         }
         case LC_ShortcutsStorage::ERROR_PARSE: {

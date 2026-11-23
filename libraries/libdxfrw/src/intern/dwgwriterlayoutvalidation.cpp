@@ -315,7 +315,8 @@ ValidationResult validateR2004DataSectionMap(
                 || sectionPage.pageNum != pageId
                 || sectionPage.dataSize != dataPageSize
                 || sectionPage.startOffset != startOffset
-                || dataPageSize != page.payloadSize)
+                || dataPageSize > page.payloadSize
+                || (section.compressionType == 1 && dataPageSize != page.payloadSize))
                 return fail(ValidationCategory::Map);
         }
     }
@@ -603,8 +604,9 @@ ValidationResult validateR2004(const R2004Snapshot& snapshot) {
                 if (page.kind != R2004PhysicalPage::Kind::Data
                     || page.sectionId != section.sectionId
                     || page.logicalOffset != expectedStartOffset
-                    || sectionPage.dataSize != page.payloadSize
-                    || page.payloadSize != section.maxPageSize
+                    || sectionPage.dataSize > page.payloadSize
+                    || (section.compressionType == 1 &&
+                        (page.payloadSize != section.maxPageSize || sectionPage.dataSize != page.payloadSize))
                     || !checkedSpan(snapshot.assembled, page.payloadOffset,
                                     page.payloadSize, payload))
                     return fail(ValidationCategory::Topology);
@@ -612,8 +614,30 @@ ValidationResult validateR2004(const R2004Snapshot& snapshot) {
                     static_cast<std::size_t>(logicalSize);
                 const std::size_t startOffsetAsSizeT =
                     static_cast<std::size_t>(expectedStartOffset);
-                const std::size_t payloadSizeAsSizeT =
-                    static_cast<std::size_t>(page.payloadSize);
+                std::array<std::uint8_t, 32> pageHeader{};
+                std::copy_n(snapshot.assembled.data() + page.headerOffset, pageHeader.size(), pageHeader.data());
+                dwgCompressor::decrypt18Hdr(pageHeader.data(), pageHeader.size(), page.address);
+                if (getRL(pageHeader.data() + 8) != sectionPage.dataSize ||
+                    getRL(pageHeader.data() + 12) != section.maxPageSize)
+                    return fail(ValidationCategory::Topology);
+                std::vector<std::uint8_t> decoded;
+                if (section.compressionType == 2) {
+                    if (page.payloadSize - sectionPage.dataSize >= 32 ||
+                        !std::all_of(payload + sectionPage.dataSize, payload + page.payloadSize,
+                                     [](std::uint8_t byte) { return byte == 0; }))
+                        return fail(ValidationCategory::Topology);
+                    if (section.maxPageSize > dwgSafety::MaxPageCap)
+                        return fail(ValidationCategory::Span);
+                    decoded.resize(section.maxPageSize);
+                    dwgCompressor decoder;
+                    if (!decoder.decompress18(payload, decoded.data(), sectionPage.dataSize, decoded.size()) ||
+                        decoder.decompressedBytes() != decoded.size())
+                        return fail(ValidationCategory::Topology);
+                    payload = decoded.data();
+                } else if (section.compressionType != 1) {
+                    return fail(ValidationCategory::Topology);
+                }
+                const auto payloadSizeAsSizeT = static_cast<std::size_t>(section.maxPageSize);
                 if (!std::equal(section.data.cbegin() + startOffsetAsSizeT,
                                 section.data.cbegin() + startOffsetAsSizeT
                                     + logicalSizeAsSizeT,
@@ -643,14 +667,12 @@ ValidationResult validateR2004(const R2004Snapshot& snapshot) {
                                         page.address);
             if (getRL(header.data()) != 0x4163043b
                 || getRL(header.data() + 4) != page.sectionId
-                || getRL(header.data() + 8) != page.payloadSize
-                || getRL(header.data() + 12) != page.payloadSize
                 || getRL(header.data() + 16) != page.logicalOffset)
                 return fail(ValidationCategory::Topology);
             const std::uint32_t storedDataChecksum =
                 getRL(header.data() + 28);
             const auto dataChecksum = dwgUtil::checksum18(
-                0, span + header.size(), page.payloadSize);
+                0, span + header.size(), getRL(header.data() + 8));
             if (storedDataChecksum != dataChecksum)
                 return fail(ValidationCategory::Checksum);
             const std::uint32_t storedHeaderChecksum =

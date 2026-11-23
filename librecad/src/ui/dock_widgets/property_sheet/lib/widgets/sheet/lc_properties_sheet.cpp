@@ -328,6 +328,7 @@ void LC_PropertiesSheet::paintEvent([[maybe_unused]] QPaintEvent* e) {
     for (int i = firstVisibleItemIndex; i <= lastVisibleItemIndex; ++i) {
         const PropertyItemView& itemView = m_itemViews[i];
 
+        painter.fillRect(itemRect, palette().brush(i % 2 ? QPalette::AlternateBase : QPalette::Base));
         paintItem(painter, itemRect, itemView);
 
         if (itemView.isSplittable()) {
@@ -912,7 +913,7 @@ void LC_PropertiesSheet::updateStylingVars() {
     const int fontHeight = fm.height();
     m_itemHeight = fontHeight + m_itemHeightSpacing;
     m_linesColor = palette().color(QPalette::Button);
-    m_propertySetBackgroundColor = m_linesColor;
+    m_propertySetBackgroundColor = palette().color(QPalette::Mid);
     m_valueLeftMargin = style()->pixelMetric(QStyle::PM_ButtonMargin);
 }
 

@@ -21,8 +21,17 @@
  ******************************************************************************/
 #include "lc_toolbarfactory.h"
 
+#include <QDockWidget>
+#include <QHBoxLayout>
 #include <QMenu>
+#include <QPainter>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSettings>
+#include <QTabBar>
+#include <QTabWidget>
+
+#include <initializer_list>
 
 #include "lc_actionfactory.h"
 #include "lc_actiongroupmanager.h"
@@ -45,6 +54,7 @@ void LC_ToolbarFactory::initToolBars(){
     m_showToolbarTooltips = LC_GET_ONE_BOOL("Startup", "ShowToolbarsTooltip", true);
     initCADToolbars();
     createCategoriesToolbar();
+    createDraftingToolbar();
     createStandardToolbars();
     createCustomToolbars();
 }
@@ -78,6 +88,12 @@ QToolBar * LC_ToolbarFactory::createSnapToolbar(const QSizePolicy &tbPolicy) con
     result->setObjectName("snap_toolbar" );
     result->setProperty("_group", 3);
     setToolbarTooltip(result, title);
+    result->addSeparator();
+    auto* grid = m_agm->getActionByName("ViewGrid");
+    result->addAction(grid);
+    if (auto* button = qobject_cast<QToolButton*>(result->widgetForAction(grid))) {
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    }
     m_appWin->m_snapToolBar = result;
     return result;
 }
@@ -231,6 +247,164 @@ QToolBar * LC_ToolbarFactory::createEntityLayersToolbar(const QSizePolicy  &tbPo
     return result;
 }
 
+void LC_ToolbarFactory::createDraftingToolbar() const {
+    auto* toolbar = doCreateToolBar(tr("Drafting Tools"), "Drafting Tools",
+                                  QSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred), 1);
+    toolbar->setAllowedAreas(Qt::TopToolBarArea);
+    toolbar->setFloatable(false);
+    toolbar->setMovable(false);
+    toolbar->setStyleSheet(QStringLiteral(R"(
+    QToolBar#draftingtools_toolbar {
+        background: #19303b;
+        border: 0;
+        padding: 0;
+    }
+    QTabWidget#draftingTabs::pane {
+        border: 0;
+        background: #203943;
+    }
+    QTabWidget#draftingTabs QTabBar::tab {
+        background: #19303b;
+        color: #c7d8dd;
+        border-bottom: 2px solid transparent;
+        padding: 4px 12px;
+    }
+    QTabWidget#draftingTabs QTabBar::tab:selected {
+        background: #203943;
+        color: #f4fcfc;
+        border-bottom-color: #58c6b8;
+    }
+    QWidget#draftingPage {
+        background: #203943;
+    }
+    QWidget#draftingPage QToolButton {
+        padding: 4px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        color: #eef8fa;
+    }
+    QWidget#draftingPage QToolButton:hover,
+    QWidget#draftingPage QToolButton:checked {
+        background: #2e505b;
+        border-color: #58c6b8;
+    }
+    QWidget#draftingPage QToolButton:disabled {
+        color: #a2b4bc;
+    }
+    )"));
+
+    auto* tabs = new QTabWidget(toolbar);
+    tabs->setObjectName("draftingTabs");
+    tabs->setDocumentMode(true);
+    tabs->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    tabs->tabBar()->setUsesScrollButtons(true);
+
+    struct DraftingTool {
+        QAction* action;
+        QString label;
+        QToolButton* button = nullptr;
+    };
+
+    const auto addPage = [&](const QString& title, std::initializer_list<DraftingTool> tools) {
+        auto* scroll = new QScrollArea(tabs);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setWidgetResizable(true);
+        scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+        auto* page = new QWidget;
+        page->setObjectName("draftingPage");
+        auto* row = new QHBoxLayout(page);
+        row->setContentsMargins(8, 2, 8, 2);
+        row->setSpacing(4);
+        for (const auto& tool : tools) {
+            auto* action = tool.action;
+            if (!action) continue;
+            auto* button = tool.button ? tool.button : new QToolButton(page);
+            button->setDefaultAction(action);
+            button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            button->setIconSize(QSize(20, 20));
+            button->setAccessibleName(tool.label);
+            const auto updateAppearance = [action, button, label = tool.label] {
+                button->setText(label);
+                QIcon icon;
+                for (const qreal scale : {1.0, 2.0}) {
+                    QPixmap glyph = action->icon().pixmap(button->iconSize(), scale);
+                    if (glyph.isNull()) continue;
+                    QPainter painter(&glyph);
+                    painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+                    painter.fillRect(glyph.rect(), QColor("#d0f2ef"));
+                    painter.end();
+                    icon.addPixmap(glyph);
+                }
+                button->setIcon(icon);
+            };
+            updateAppearance();
+            connect(action, &QAction::changed, button, updateAppearance);
+            row->addWidget(button);
+        }
+        row->addStretch();
+        scroll->setWidget(page);
+        const auto updateHeight = [scroll, page] {
+            auto* scrollbar = scroll->horizontalScrollBar();
+            const int scrollHeight = scrollbar->maximum() > 0 ? scrollbar->sizeHint().height() : 0;
+            scroll->setMinimumHeight(page->minimumSizeHint().height() + scrollHeight);
+        };
+        connect(scroll->horizontalScrollBar(), &QScrollBar::rangeChanged, scroll, updateHeight);
+        updateHeight();
+        tabs->addTab(scroll, title);
+    };
+
+    const auto actionByName = [this](const char* name) {
+        return m_agm->getActionByName(name);
+    };
+    const auto dockAction = [this](const char* name, const char* icon) -> QAction* {
+        auto* dock = m_appWin->findChild<QDockWidget*>(QLatin1String(name));
+        if (!dock) return nullptr;
+        auto* action = dock->toggleViewAction();
+        action->setIcon(QIcon(QLatin1String(icon)));
+        return action;
+    };
+
+    addPage(tr("Draw"), {
+        {actionByName("DrawLine"), tr("Line")}, {actionByName("DrawPolyline"), tr("Polyline")},
+        {actionByName("DrawLineRectangle2Points"), tr("Rectangle")}, {actionByName("DrawCircle"), tr("Circle")},
+        {actionByName("DrawArc3P"), tr("Arc")}, {actionByName("DrawHatch"), tr("Hatch")}
+    });
+    addPage(tr("Modify"), {
+        {actionByName("ModifyMove"), tr("Move / Copy")}, {actionByName("ModifyOffset"), tr("Offset")},
+        {actionByName("ModifyTrim"), tr("Trim")}, {actionByName("ModifyRotate"), tr("Rotate")},
+        {actionByName("ModifyMirror"), tr("Mirror")}, {actionByName("ModifyScale"), tr("Scale")}
+    });
+    addPage(tr("Annotate"), {
+        {actionByName("DrawText"), tr("Text")}, {actionByName("DimLinear"), tr("Linear")},
+        {actionByName("DimAligned"), tr("Aligned")}, {actionByName("InfoDist"), tr("Distance")}
+    });
+    addPage(tr("View"), {
+        {actionByName("ZoomAuto"), tr("Fit drawing")}, {actionByName("ZoomWindow"), tr("Zoom area")},
+        {actionByName("ZoomPan"), tr("Pan")}, {actionByName("ViewGrid"), tr("Grid")},
+        {actionByName("FocusCommand"), tr("Command line")}
+    });
+
+    auto* workspacePicker = new LC_WorkspaceListButton(m_appWin);
+    workspacePicker->setParent(tabs);
+    workspacePicker->setPopupMode(QToolButton::InstantPopup);
+    auto* restoreWorkspace = actionByName("WorkspaceRestore");
+    connect(m_appWin, &QC_ApplicationWindow::workspacesChanged,
+            workspacePicker, &LC_WorkspaceListButton::enableSubActions);
+    addPage(tr("Workspace"), {
+        {dockAction("layer_dockwidget", ":/icons/layer_list.lci"), tr("Layers")},
+        {dockAction("property_sheet", ":/icons/properties.lci"), tr("Properties")},
+        {dockAction("command_dockwidget", ":/icons/edit_clear.lci"), tr("Command line")},
+        {actionByName("ShortcutsOptions"), tr("Shortcuts")},
+        {actionByName("WorkspaceCreate"), tr("Save layout")},
+        {restoreWorkspace, tr("Restore layout"), workspacePicker}
+    });
+
+    toolbar->addWidget(tabs);
+    addToTop(toolbar);
+    m_appWin->addToolBarBreak(Qt::TopToolBarArea);
+}
+
 void LC_ToolbarFactory::createStandardToolbars(){
     constexpr QSizePolicy tbPolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
@@ -254,6 +428,11 @@ void LC_ToolbarFactory::createStandardToolbars(){
     const auto creators = createCreatorsToolbar(tbPolicy);
     const auto preferences = createPreferencesToolbar(tbPolicy);
 
+    // Keep the specialist toolbars available in View. The default row exposes
+    // file, edit, workspace and active tool controls.
+    for (auto* toolbar : {infoCursor, view, viewsList, ucsList, preferences, entityLayers}) {
+        toolbar->hide();
+    }
     addToTop(infoCursor);
     addToTop(file);
     addToTop(edit);
@@ -262,7 +441,6 @@ void LC_ToolbarFactory::createStandardToolbars(){
     addToTop(viewsList);
     addToTop(ucsList);
     addToTop(preferences);
-    m_appWin->addToolBarBreak();
     addToTop(pen);
     addToTop(entityLayers);
     addToTop(m_appWin->m_toolOptionsToolbar);

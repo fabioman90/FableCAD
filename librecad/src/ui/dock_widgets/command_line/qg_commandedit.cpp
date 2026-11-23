@@ -95,9 +95,6 @@ bool calculatorEvaluation(const QString& input){
  */
 QG_CommandEdit::QG_CommandEdit(QWidget* parent)
     : QLineEdit(parent), m_relativeRay("none") {
-#ifndef DONT_FORCE_WIDGETS_CSS
-    setStyleSheet("selection-color: white; selection-background-color: green;");
-#endif
     setFrame(false);
     setFocusPolicy(Qt::StrongFocus);
 }

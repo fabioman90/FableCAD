@@ -63,8 +63,12 @@ bool convertFile(const QString& inputFile, const QString& outputFile, RS2::Forma
     if (!LC_Console::importGraphic(graphic, inputFile))
         return false;
 
-    if (!RS_FileIO::instance()->fileExport(graphic, outputFile, outFmt)) {
+    auto* fileIO = RS_FileIO::instance();
+    if (!fileIO->fileExport(graphic, outputFile, outFmt)) {
         qCritical("ERROR: failed to export '%s'", qPrintable(outputFile));
+        const auto report = fileIO->lastExportReport();
+        if (!report.isEmpty())
+            qCritical("%s", qPrintable(report));
         return false;
     }
 
@@ -111,7 +115,7 @@ int runDwgAdmissionReport(int argc, char** argv) {
     QCoreApplication app(normalizedArgc, normalizedArgv);
     QCoreApplication::setOrganizationName("LibreCAD");
     QCoreApplication::setApplicationName("LibreCAD");
-    QCoreApplication::setApplicationVersion(XSTR(LC_VERSION));
+    QCoreApplication::setApplicationVersion(LCVersion());
     RS_Settings::init(app.organizationName(), app.applicationName());
     RS_SYSTEM->init(app.applicationName(), app.applicationVersion(),
                     XSTR(QC_APPDIR), normalizedArgv[0]);
@@ -154,7 +158,7 @@ int runDwgAdmissionReport(int argc, char** argv) {
     const RS2::FormatType target = formatForDwgVersion(
         graphic.dwgAdvancedMetadata().sourceDwgVersion());
     if (target == RS2::FormatUnknown) {
-        qCritical("ERROR: imported DWG version has no LibreCAD DWG export target.");
+        qCritical("ERROR: imported DWG version has no FableCAD DWG export target.");
         return EXIT_FAILURE;
     }
 
@@ -192,7 +196,7 @@ int runConversion(int argc, char** argv,
     QCoreApplication app(normalizedArgc, normalizedArgv);
     QCoreApplication::setOrganizationName("LibreCAD");
     QCoreApplication::setApplicationName("LibreCAD");
-    QCoreApplication::setApplicationVersion(XSTR(LC_VERSION));
+    QCoreApplication::setApplicationVersion(LCVersion());
 
     RS_Settings::init(app.organizationName(), app.applicationName());
     RS_SYSTEM->init(app.applicationName(), app.applicationVersion(), XSTR(QC_APPDIR),
@@ -233,7 +237,7 @@ int runConversion(int argc, char** argv,
 
 #ifdef DWGSUPPORT
     QCommandLineOption dwgVersionOpt(QStringList() << "V" << "dwg-version",
-        QObject::tr("DWG output version: r2000 (default), r2004, r2007, r2010, r2013, r2018."), "version");
+        QObject::tr("DWG output version: r2000 (default), r2004, r2007, r2010, r2013, r2018 (AutoCAD 2020, alias r2020)."), "version");
     if (outputExt == "dwg")
         parser.addOption(dwgVersionOpt);
 #endif
@@ -259,7 +263,7 @@ int runConversion(int argc, char** argv,
     if (outputExt == "dwg" && parser.isSet(dwgVersionOpt)) {
         outFmt = LC_Console::dwgFormatForVersion(parser.value(dwgVersionOpt));
         if (outFmt == RS2::FormatUnknown) {
-            qCritical("ERROR: unknown DWG version '%s'; use r2000, r2004, r2007, r2010, r2013, or r2018.",
+            qCritical("ERROR: unknown DWG version '%s'; use r2000, r2004, r2007, r2010, r2013, or r2018 (alias r2020).",
                       qPrintable(parser.value(dwgVersionOpt)));
             return EXIT_FAILURE;
         }

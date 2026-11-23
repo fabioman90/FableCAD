@@ -52,7 +52,8 @@ namespace {
         "Drawing Exchange DXF R12 (*.dxf)",
 
 #ifdef DWGSUPPORT
-        "DWG Drawing (*.dwg)",
+        LC_FileDialogService::dwg2018NameFilter,
+        "DWG R2000 (*.dwg)",
 #endif
 
         "LFF Font (*.lff)",
@@ -76,6 +77,7 @@ namespace {
         RS2::FormatDXFRW12,
 
 #ifdef DWGSUPPORT
+        RS2::FormatDWG2018,
         RS2::FormatDWG,
 #endif
 
@@ -150,13 +152,43 @@ namespace {
 LC_FileDialogService::FileDialogResult LC_FileDialogService::getFileDetails (const FileDialogMode fileDialogMode,
                                                                              const QString &currentFileName,
                                                                              const RS2::FormatType preferredType){
+    return getFileDetails(fileDialogMode, currentFileName, preferredType, RS2::FormatUnknown, {});
+}
+
+LC_FileDialogService::FileDialogResult LC_FileDialogService::getFileDetails(FileDialogMode fileDialogMode,
+                                                                             const QString& currentFileName,
+                                                                             RS2::FormatType preferredType,
+                                                                             RS2::FormatType originalType,
+                                                                             const QString& originalFilter) {
     RS_DEBUG->print("LC_FileDialogService::getFileName");
 
     auto [initialDir, nameFilter] = readDefaultDirFilter();
+#ifdef DWGSUPPORT
+    // Older preferences stored an unlabeled DWG filter that meant R2000.
+    if (nameFilter == QLatin1String("DWG Drawing (*.dwg)")) {
+        nameFilter = FILTERS_STRING_LIST.at(FILTERS_TYPE_LIST.indexOf(RS2::FormatDWG));
+    } else if (nameFilter == QLatin1String("DWG R2018 (*.dwg)")) {
+        nameFilter = dwg2018NameFilter;
+    }
+#endif
     const int preferredFilter = FILTERS_TYPE_LIST.indexOf(preferredType);
     if (preferredFilter >= 0) {
         nameFilter = FILTERS_STRING_LIST.at(preferredFilter);
     }
+
+    QStringList filters = FILTERS_STRING_LIST;
+    const bool includeOriginal = fileDialogMode == SaveDrawing && !originalFilter.isEmpty();
+    if (includeOriginal) {
+#ifdef DWGSUPPORT
+        filters.insert(filters.indexOf(dwg2018NameFilter) + 1, originalFilter);
+#else
+        filters.prepend(originalFilter);
+#endif
+        if (preferredType == originalType)
+            nameFilter = originalFilter;
+    }
+    if (!filters.contains(nameFilter))
+        nameFilter = FILTERS_STRING_LIST.at(FILTERS_TYPE_LIST.indexOf(RS2::FormatDXFRW));
 
     // If the caller passes the current file path, use its directory as the
     // starting location and pre-select its base name (without extension).
@@ -172,7 +204,7 @@ LC_FileDialogService::FileDialogResult LC_FileDialogService::getFileDetails (con
     auto saveFileDialog = std::make_unique<QFileDialog>( nullptr,
                                                          FILE_DIALOG_TITLES.at (fileDialogMode),
                                                          initialDir,
-                                                         FILTERS_STRING_LIST.join(";;"));
+                                                         filters.join(";;"));
 
     saveFileDialog->selectNameFilter (nameFilter);
     if (!preselectName.isEmpty()) {
@@ -223,7 +255,8 @@ LC_FileDialogService::FileDialogResult LC_FileDialogService::getFileDetails (con
             result.fileName = QFileInfo(result.filePath).fileName();
 
             const QString selectedFilter = saveFileDialog->QFileDialog::selectedNameFilter();
-            result.fileType = getFormatType(selectedFilter);
+            result.fileType = includeOriginal && selectedFilter == originalFilter
+                ? originalType : getFormatType(selectedFilter);
 
             // update file extension info
             updateFileExtension(result, selectedFilter);
@@ -250,7 +283,8 @@ LC_FileDialogService::FileDialogResult LC_FileDialogService::getFileDetails (con
             LC_GROUP_GUARD("Paths");
             {
                 LC_SET(FILE_IO_SETTINGS_PATHS.at(fileDialogMode), result.dirPath);
-                LC_SET(FILTER_SETTINGS_PATHS.at(fileDialogMode), selectedFilter);
+                if (!includeOriginal || selectedFilter != originalFilter)
+                    LC_SET(FILTER_SETTINGS_PATHS.at(fileDialogMode), selectedFilter);
             }
 
             break;

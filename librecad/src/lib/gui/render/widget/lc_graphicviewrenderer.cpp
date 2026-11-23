@@ -41,7 +41,7 @@
 #include "rs_settings.h"
 
 namespace {
-constexpr char const* g_drawingMdiWindowBackground = "#212830";
+constexpr char const* g_drawingMdiWindowBackground = "#182431";
 }
 
 LC_GraphicViewRenderer::LC_GraphicViewRenderer(LC_GraphicViewport* viewport, QPaintDevice* d)

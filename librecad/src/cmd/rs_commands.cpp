@@ -331,6 +331,10 @@ std::map<QString, QString> RS_Commands::readAliasFile(const QString& aliasName){
 
         const QString& alias = txtList[0];
         const QString& cmd = txtList[1];
+        // Older builds wrote this exact default into librecad.alias.
+        if (alias == QStringLiteral("tr") && cmd == QStringLiteral("circletan2cp")) {
+            continue;
+        }
         const RS2::ActionType action = commandToAction(cmd);
         if (action == RS2::ActionNone) {
             LC_ERR<<__func__<<"(): "<<QObject::tr("requesting alias(%1) for unknown command(%2): ignored").arg(alias, cmd);

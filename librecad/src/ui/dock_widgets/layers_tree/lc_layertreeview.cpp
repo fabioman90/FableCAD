@@ -40,7 +40,6 @@ class LayerTreeGridDelegate:public QStyledItemDelegate {
 public:
     explicit LayerTreeGridDelegate(LC_LayerTreeView *parent = nullptr, LC_LayerTreeModel* tm = nullptr):QStyledItemDelegate(parent){
         if (parent != nullptr) {
-            m_treeView = parent;
             m_treeModel = tm;
             m_options = tm->getOptions();
             const auto palette = parent->palette();
@@ -115,7 +114,6 @@ public:
             const LC_LayerTreeItem *layerItem = m_treeModel->getItemForIndex(index);
             const bool nonVirtualItem = layerItem != nullptr && !layerItem->isVirtual();
             if (actualCol == LC_LayerTreeModel::COLUMN_COLOR_SAMPLE && nonVirtualItem) {
-                m_treeView->style()->drawPrimitive(QStyle::PE_PanelItemViewRow, &option, painter, m_treeView);
                 QRect colorRect = option.rect;
                 const int originalWidth = colorRect.width();
                 const int newWidth = colorRect.height() - 8;
@@ -126,7 +124,7 @@ public:
 
                 colorRect.adjust(leftDelta, 4, -rightDelta, -4);
 
-                painter->fillRect(colorRect, Qt::black);
+                painter->fillRect(colorRect, option.palette.color(QPalette::Mid));
                 colorRect.adjust(1, 1, -1, -1);
                 const auto color = layerItem->getLayer()->getPen().getColor();
                 painter->fillRect(colorRect, color);
@@ -150,7 +148,6 @@ public:
     }
 
 private:
-    LC_LayerTreeView* m_treeView;
     LC_LayerTreeModel* m_treeModel{nullptr};
     QColor m_hoverBackgroundColor;
     QColor m_customHoverTextColor;

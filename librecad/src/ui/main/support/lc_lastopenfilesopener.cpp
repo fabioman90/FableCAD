@@ -84,7 +84,7 @@ void LC_LastOpenFilesOpener::openLastOpenFiles(QStringList &fileList,  QSplashSc
             for (auto & it : fileList) {
                 if (splash != nullptr) {
                     auto message = QObject::tr("Loading File %1..").arg(QDir::toNativeSeparators(it));
-                    splash->showMessage(message,Qt::AlignRight | Qt::AlignBottom, Qt::black);
+                    splash->showMessage(message, Qt::AlignRight | Qt::AlignBottom, QColor("#d4e8eb"));
                     qApp->processEvents();
                 }
                 m_appWindow->openFile(it);

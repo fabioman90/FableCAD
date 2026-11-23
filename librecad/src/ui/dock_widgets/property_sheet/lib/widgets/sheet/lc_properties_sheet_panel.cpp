@@ -96,6 +96,7 @@ bool LC_PropertiesSheetPanel::stopInplaceEdit(const bool deleteLater, const bool
 
 void LC_PropertiesSheetPanel::createDescriptionLabel(QSplitter* splitter) {
     m_propertyInfoLabel = new QLabel(splitter);
+    m_propertyInfoLabel->setObjectName("propertyDescription");
     m_propertyInfoLabel->setTextFormat(Qt::RichText);
     m_propertyInfoLabel->setAlignment(Qt::AlignTop);
     m_propertyInfoLabel->setWordWrap(true);

@@ -79,7 +79,7 @@ struct Builder {
             !finite(destination) || std::abs(destination.x()) > maximumCoordinate ||
             std::abs(destination.y()) > maximumCoordinate)
             return fail(Converter::ErrorCode::NumericRange,
-                        QStringLiteral("The transformed contour exceeds LibreCAD's native coordinate range (+/-%1 document units)")
+                        QStringLiteral("The transformed contour exceeds the supported coordinate range (+/-%1 document units)")
                             .arg(maximumCoordinate, 0, 'g', 15));
         const long double magnitude = std::max(
             std::abs(static_cast<long double>(x1)) + std::abs(static_cast<long double>(x2)) + std::abs(static_cast<long double>(affine.dx)),

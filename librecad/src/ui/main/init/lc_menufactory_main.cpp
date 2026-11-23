@@ -32,7 +32,6 @@
 #include "lc_actionfactory.h"
 #include "lc_actiongroupmanager.h"
 #include "lc_menufactory.h"
-#include "lc_releasechecker.h"
 #include "main.h"
 #include "qc_applicationwindow.h"
 #include "qc_mdiwindow.h"
@@ -123,44 +122,20 @@ void LC_MenuFactoryMain::createHelpMenu(QMenuBar* menuBar, QList<QMenu*>& topMen
     const auto menuHelp = menu(tr("&Help"), "help", menuBar);
     m_menusHolder->m_menuHelp = menuHelp;
 
-    subMenuWithActions(menuHelp, tr("On&line Docs"), "OnlineInfo", nullptr, {
-                           urlActionTR(tr("&Wiki"), "https://dokuwiki.librecad.org/"),
-                           urlActionTR(tr("User's &Manual"), "https://librecad.readthedocs.io/"),
-                           urlActionTR(tr("&Commands"), "https://librecad.readthedocs.io/en/latest/ref/tools.html"),
-                           urlActionTR(tr("&Style Sheets"),
-                                       "https://librecad.readthedocs.io/en/latest/ref/customize.html#style-sheets"),
-                           urlActionTR(tr("Wid&gets"),
-                                       "https://librecad.readthedocs.io/en/latest/ref/menu.html#widgets")
-                       });
-
-    const auto help_about = new QAction(QIcon(":/images/librecad.png"), tr("About"), m_appWin);
+    const auto help_about = new QAction(QIcon(":/images/fablecad.svg"), tr("About"), m_appWin);
     connect(help_about, &QAction::triggered, m_appWin, &QC_ApplicationWindow::showAboutWindow);
 
     const auto license = new QAction(QObject::tr("License"), m_appWin);
     connect(license, &QAction::triggered, m_appWin, &QC_ApplicationWindow::invokeLicenseWindow);
 
+    menuHelp->QWidget::addAction(urlActionTR(tr("&Project repository"), "https://github.com/fabioman90/FableCAD"));
+    const auto checkUpdates = new QAction(tr("Check for Updates…"), m_appWin);
+    checkUpdates->setMenuRole(QAction::NoRole);
+    connect(checkUpdates, &QAction::triggered, m_appWin, &QC_ApplicationWindow::forceCheckForNewVersion);
+    menuHelp->QWidget::addAction(checkUpdates);
     menuHelp->addSeparator();
-    menuHelp->QWidget::addAction(urlActionTR(tr("&Forum"), "https://forum.librecad.org/"));
-    menuHelp->QWidget::addAction(urlActionTR(tr("Zulip &Chat"), "https://librecad.zulipchat.com/"));
-    menuHelp->addSeparator();
-    menuHelp->QWidget::addAction(urlActionTR(tr("&Submit Error"), "https://github.com/LibreCAD/LibreCAD/issues/new"));
-    menuHelp->QWidget::addAction(urlActionTR(tr("&Request Feature"), "https://github.com/LibreCAD/LibreCAD/issues"));
-    // The Store updates its own packages; it should not lead to other downloads.
-    const bool fromStore = LC_ReleaseChecker::runsFromStorePackage();
-    if (!fromStore) {
-        menuHelp->QWidget::addAction(urlActionTR(tr("&Releases Page"), "https://github.com/LibreCAD/LibreCAD/releases"));
-    }
-    menuHelp->addSeparator();
-
-    if (XSTR(LC_PRERELEASE) && !fromStore) {
-        // fixme - this is makes sense only for pre-release versions. Of course, the generation of tag included into URL should be more intelligent..
-        menuHelp->QWidget::addAction(urlActionTR(tr("&Dev Snapshot Release"), " https://github.com/LibreCAD/LibreCAD/releases/tag/continuous"));
-        menuHelp->addSeparator();
-    }
-
     menuHelp->QWidget::addAction(help_about);
     menuHelp->QWidget::addAction(license);
-    menuHelp->QWidget::addAction(urlActionTR(tr("&Donate"), "https://librecad.org/donate.html"));
 
     topMenuMenus << menuHelp;
 }

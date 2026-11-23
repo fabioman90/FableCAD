@@ -76,7 +76,7 @@ LONG WINAPI windowsCrashHandler(EXCEPTION_POINTERS* pExceptionInfo)
 
     if (pFile != nullptr) {
         fprintf(pFile, "=========================================\n");
-        fprintf(pFile, "LibreCAD Crash Report\n");
+        fprintf(pFile, "FableCAD Crash Report\n");
         // fprintf(pFile, "Version: %s\n", XSTR(LC_VERSION));
         fprintf(pFile, "=========================================\n\n");
 
@@ -175,7 +175,7 @@ LONG WINAPI windowsCrashHandler(EXCEPTION_POINTERS* pExceptionInfo)
         fprintf(pFile, "=========================================\n");
         fclose(pFile);
 
-        printf("\n\n*** LibreCAD has crashed ***\n");
+        printf("\n\n*** FableCAD has crashed ***\n");
         printf("Crash log saved to: %s\n\n", crashFileName);
     }
 
@@ -314,7 +314,7 @@ bool buildCrashFileName(char* out, size_t outSize, pid_t pid, time_t now)
     if (_NSGetExecutablePath(out, &size) == 0) {
         while (base < outSize && out[base] != '\0') ++base;
     } else {
-        const char* fallback = "LibreCAD";
+        const char* fallback = "FableCAD";
         while (fallback[base] && base < outSize - 1) {
             out[base] = fallback[base];
             ++base;
@@ -374,7 +374,7 @@ void posixSignalHandler(int sig, siginfo_t* info, [[maybe_unused]] void* context
                   0600);
     if (fd >= 0) {
         writeStr(fd, "=========================================\n"
-                     "LibreCAD Crash Report\n"
+                     "FableCAD Crash Report\n"
                      "=========================================\n\n");
 
         writeStr(fd, "Crash Time (epoch s.us): ");
@@ -409,7 +409,7 @@ void posixSignalHandler(int sig, siginfo_t* info, [[maybe_unused]] void* context
                      "=========================================\n");
         close(fd);
 
-        writeStr(STDERR_FILENO, "\n*** LibreCAD has crashed ***\nCrash log: ");
+        writeStr(STDERR_FILENO, "\n*** FableCAD has crashed ***\nCrash log: ");
         writeStr(STDERR_FILENO, crashFileName);
         writeStr(STDERR_FILENO, "\n");
     }

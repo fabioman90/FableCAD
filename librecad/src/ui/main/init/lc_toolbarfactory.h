@@ -44,6 +44,7 @@ private:
     LC_ActionGroupManager *m_agm;
     LC_ActionFactory *m_actionFactory;
     bool m_showToolbarTooltips{true};
+    void createDraftingToolbar() const;
     void createStandardToolbars();
     void addInfoCursorOptionAction(QMenu *menu, const char *name, int tag) const;
     void initCADToolbars() const;

@@ -492,6 +492,28 @@ TEST_CASE("DWG layout validators accept writer snapshots",
           == ValidationCategory::None);
 }
 
+TEST_CASE("R2004 multi-page sections use independently decodable pages",
+          "[dwg-write][layout][r2004]") {
+    const auto path = std::filesystem::temp_directory_path() / "libdxfrw_multi_page.dwg";
+    DwgDxfOutputTransaction output(path.string(), std::ios::binary);
+    REQUIRE(output.open());
+    static bool observedTwoPages;
+    observedTwoPages = false;
+    dwgWriterLayoutValidation::setTestSnapshotObserver([](Snapshot& snapshot) {
+        for (const auto& section : std::get<R2004Snapshot>(snapshot).sections) {
+            if (section.name == "AcDb:ValidatorStress" && section.pages.size() == 2) {
+                observedTwoPages = section.compressionType == 2
+                    && section.pages[0].startOffset == 0
+                    && section.pages[1].startOffset == section.maxPageSize;
+            }
+        }
+    });
+    const bool written = writeLargeR2004Document(output);
+    dwgWriterLayoutValidation::setTestSnapshotObserver(nullptr);
+    CHECK(written);
+    CHECK(observedTwoPages);
+}
+
 TEST_CASE("R2004 layout validation rejects topology, checksum, and semantic map mutations",
           "[dwg-write][layout][r2004]") {
     CHECK(runMutation<dwgWriter18>(Mutation::R2004Topology)

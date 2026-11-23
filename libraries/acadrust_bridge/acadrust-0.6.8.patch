@@ -1,0 +1,22 @@
+--- a/src/io/dwg/dwg_stream_writers/object_writer/mod.rs
++++ b/src/io/dwg/dwg_stream_writers/object_writer/mod.rs
+@@ -2402,11 +2402,14 @@
+             &common.edge_visual_style_handle,
+         );
+ 
+-        self.writer.write_variable_text(dwg_block_name(
+-            self.document,
+-            record,
+-            self.paper_space_block_handle,
+-        ));
++        // The BLOCK_RECORD stores the anonymous prefix, while the BLOCK
++        // delimiter retains the complete name for name-based consumers.
++        let name = if record.flags.anonymous && !record.is_paper_space() {
++            &record.name
++        } else {
++            dwg_block_name(self.document, record, self.paper_space_block_handle)
++        };
++        self.writer.write_variable_text(name);
+ 
+         self.register_object(common.handle);
+     }

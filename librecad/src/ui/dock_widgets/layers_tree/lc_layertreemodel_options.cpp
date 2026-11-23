@@ -35,10 +35,10 @@ void LC_LayerTreeModelOptions::loadDefaults(bool isDark) {
     QPalette palette = QApplication::palette();
 
     if (isDark) {
-        matchedItemColor = QColor("blue");
+        matchedItemColor = palette.color(QPalette::Link);
         virtualLayerBgColor  = palette.color(QPalette::AlternateBase);
         selectedItemBgColor  = palette.color(QPalette::Highlight);
-        activeLayerBgColor  = palette.color(QPalette::Mid);
+        activeLayerBgColor  = palette.color(QPalette::Highlight);
     }
     else {
         matchedItemColor = QColor("blue");

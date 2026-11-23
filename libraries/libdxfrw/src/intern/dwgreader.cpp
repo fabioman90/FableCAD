@@ -6854,7 +6854,7 @@ bool dwgReader::readDwgHandles(dwgBuffer *dbuf, std::uint64_t offset,
   // Some R2010 files retain a duplicate empty-page trailer after the
   // HANDLES terminator, inside the section's declared decompressed size.
   // Accept only a second terminator with the checksum calculated for 00 02;
-  // arbitrary trailing bytes remain an error.
+  // this special case still requires a matching checksum.
   if (maxPos - startPos == 4) {
     const std::array<std::uint8_t, 4> trailer = {
         dbuf->getRawChar8(), dbuf->getRawChar8(), dbuf->getRawChar8(),
@@ -6873,9 +6873,23 @@ bool dwgReader::readDwgHandles(dwgBuffer *dbuf, std::uint64_t offset,
     }
   }
   if (startPos != maxPos) {
-    recordFailure(DwgIntegrityCheckKind::ObjectMapProgress, startPos, true,
-                  maxPos, startPos, true);
-    return false;
+    // R2018 compressed sections can retain one group of allocation slack
+    // after a complete, CRC-verified map. It contains no active handles.
+    const bool r2018AllocationTail =
+        version == DRW::AC1032 &&
+        offsetSpace == DwgIntegrityAddressSpace::DecodedBuffer &&
+        startPos < maxPos &&
+        maxPos - startPos <= dwgSafety::MaxHandleMapGroupSize;
+    if (!r2018AllocationTail) {
+      recordFailure(DwgIntegrityCheckKind::ObjectMapProgress, startPos, true,
+                    maxPos, startPos, true);
+      return false;
+    }
+    recordIntegrityDiagnostic(
+        DwgIntegritySeverity::Warning, offsetSpace,
+        DwgIntegrityPhase::ObjectMap, DwgIntegrityCheckKind::ObjectMapProgress,
+        secEnum::HANDLES, sectionDescriptorId, "AcDb:Handles", 0, false,
+        startPos, true, 0, false, maxPos, startPos, true);
   }
   const auto objectMapSize = ObjectMap.size();
   const auto stagedMapSize = stagedMap.size();
@@ -7931,6 +7945,35 @@ bool dwgReader::readDwgBlocks(DRW_Interface &intfa, dwgBuffer *dbuf,
       return false;
     }
   };
+
+  // A DWG BLOCK_RECORD may contain only the anonymous prefix (for example
+  // "*B"), while its BLOCK delimiter contains the actual name ("*B10").
+  // Resolve those names by record handle before reading any nested INSERT.
+  // A reference can point to a block whose delimiter is visited later.
+  for (const auto &item : blockRecordmap) {
+    auto *record = item.second;
+    const auto &prefix = record->name;
+    if (prefix.size() != 2u || prefix[0] != '*')
+      continue;
+    const auto object = ObjectMap.find(record->block);
+    if (object == ObjectMap.end())
+      continue;
+    DwgObjectFrame frame;
+    if (!frame.readAt(*dbuf, version, object->second.loc))
+      continue;
+    auto &body = frame.body();
+    dwgBuffer buffer(body.data(), body.size(), &decoder);
+    auto typeBuffer = buffer.forkIndependent();
+    if (typeBuffer.getObjType(version) != dwgType::BLOCK || !typeBuffer.isGood())
+      continue;
+    DRW_Block delimiter;
+    if (parseBlock(delimiter, buffer, frame.bodyBitSize()) &&
+        delimiter.handle == record->block &&
+        delimiter.parentHandle == record->handle &&
+        !delimiter.name.empty() && !isSpaceBlockRecordName(delimiter.name)) {
+      record->name = std::move(delimiter.name);
+    }
+  }
 
   auto quarantineOwnedEntities = [&](const DRW_Block_Record &record) {
     const auto quarantine = [&](std::uint32_t handle) {

@@ -23,23 +23,20 @@
 
 #include <QApplication>
 #include <QFile>
+#include <QPixmapCache>
 #include <QStyleFactory>
 
+#include "lc_iconcolorsoptions.h"
 #include "rs_settings.h"
 
 void LC_CustomStyleHelper::loadFromSettings() {
-    LC_GROUP("Widgets");
-    {
-        const bool allowStyle = LC_GET_BOOL("AllowStyle", false);
-        if (allowStyle) {
-            const QString style = LC_GET_STR("Style", "");
-            QApplication::setStyle(QStyleFactory::create(style));
-        }
+    if (LC_GET_ONE_BOOL("Widgets", "AllowStyle", false)) {
+        const QString style = LC_GET_ONE_STR("Widgets", "Style", "");
+        QApplication::setStyle(QStyleFactory::create(style));
+    }
 
-        const QString sheet_path = LC_GET_STR("StyleSheet", "");
-        if (LC_GET_BOOL("AllowStyleSheet", true) && loadStyleSheet(sheet_path)) {
-            m_styleSheetPath = sheet_path;
-        }
+    if (LC_GET_ONE_BOOL("Widgets", "AllowStyleSheet", true)) {
+        loadStyleSheet(LC_GET_ONE_STR("Widgets", "StyleSheet", ""));
     }
 }
 
@@ -47,13 +44,135 @@ bool LC_CustomStyleHelper::loadStyleSheet(const QString& path) {
     if (!path.isEmpty() && QFile::exists(path)) {
         QFile file(path);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            if (m_previousPalette) {
+                QApplication::setPalette(*m_previousPalette);
+                m_previousPalette.reset();
+                LC_IconColorsOptions icons;
+                icons.loadSettings();
+                icons.applyOptions();
+                QPixmapCache::clear();
+            }
             qApp->setStyleSheet(QString::fromLatin1(file.readAll()));
             m_styleSheetPath = path;
             return true;
         }
     }
     else {
-        qApp->setStyleSheet("");
+        if (!m_previousPalette) {
+            m_previousPalette = QApplication::palette();
+        }
+        QPalette palette = *m_previousPalette;
+        palette.setColor(QPalette::Window, QColor("#202e3a"));
+        palette.setColor(QPalette::Base, QColor("#17232e"));
+        palette.setColor(QPalette::AlternateBase, QColor("#263746"));
+        palette.setColor(QPalette::Button, QColor("#293b49"));
+        palette.setColor(QPalette::WindowText, QColor("#e1edf2"));
+        palette.setColor(QPalette::Text, QColor("#e1edf2"));
+        palette.setColor(QPalette::ButtonText, QColor("#e1edf2"));
+        palette.setColor(QPalette::PlaceholderText, QColor("#9fb4c1"));
+        palette.setColor(QPalette::Mid, QColor("#405665"));
+        palette.setColor(QPalette::Highlight, QColor("#30605e"));
+        palette.setColor(QPalette::HighlightedText, QColor("#f4fcfc"));
+        palette.setColor(QPalette::ToolTipBase, QColor("#293b49"));
+        palette.setColor(QPalette::ToolTipText, QColor("#e1edf2"));
+        palette.setColor(QPalette::Link, QColor("#6cd3c3"));
+        for (const auto role : {QPalette::WindowText, QPalette::Text, QPalette::ButtonText}) {
+            palette.setColor(QPalette::Disabled, role, QColor("#93a4af"));
+        }
+        QApplication::setPalette(palette);
+        LC_IconColorsOptions icons;
+        icons.loadSettings();
+        icons.applyOptions();
+        QPixmapCache::clear();
+
+        qApp->setStyleSheet(QStringLiteral(R"(
+            QMainWindow, QDockWidget, QMenuBar, QMenu, QStatusBar, QToolBar {
+                background: palette(window);
+                color: palette(window-text);
+            }
+            QMainWindow::separator {
+                background: palette(alternate-base);
+                width: 4px;
+                height: 4px;
+            }
+            QMainWindow::separator:hover {
+                background: palette(highlight);
+            }
+            QTabBar::tab {
+                background: palette(alternate-base);
+                color: palette(window-text);
+                border: 1px solid palette(window);
+                padding: 4px 8px;
+            }
+            QTabBar::tab:selected {
+                background: palette(button);
+                border-bottom-color: #6cd3c3;
+            }
+            QMenu::item:selected, QMenuBar::item:selected {
+                background: palette(highlight);
+            }
+            QLineEdit, QAbstractSpinBox, QComboBox, QTreeView, QListView, QTableView {
+                background: palette(base);
+                color: palette(text);
+                border: 1px solid palette(mid);
+                border-radius: 3px;
+            }
+            QComboBox, QAbstractSpinBox {
+                padding: 2px 4px;
+            }
+            QLineEdit:focus, QComboBox:focus, QAbstractSpinBox:focus {
+                border-color: #6cd3c3;
+            }
+            QToolBar {
+                spacing: 3px;
+                padding: 1px;
+            }
+            QToolBar QToolButton {
+                padding: 2px;
+                border: 1px solid transparent;
+                border-radius: 4px;
+            }
+            QToolBar QToolButton:hover {
+                background: palette(alternate-base);
+                border-color: #6cd3c3;
+            }
+            QToolBar QToolButton:checked,
+            QToolBar QToolButton:pressed {
+                background: palette(highlight);
+                border-color: #6cd3c3;
+            }
+            QDockWidget#command_dockwidget QLineEdit#leCommand {
+                padding: 4px 7px;
+                border: 1px solid palette(mid);
+                border-radius: 4px;
+            }
+            QDockWidget#command_dockwidget QLineEdit#leCommand:focus {
+                border-color: #6cd3c3;
+            }
+            QDockWidget::title {
+                background: palette(alternate-base);
+                padding: 5px;
+            }
+            QToolBar#snap_toolbar QToolButton:checked {
+                color: palette(highlighted-text);
+                background: palette(highlight);
+                border-color: #6cd3c3;
+                border-bottom-width: 2px;
+            }
+            QWidget#LC_PropertySheetWidget QWidget#headerSelection,
+            QWidget#LC_PropertySheetWidget QWidget#headerAction {
+                background: palette(alternate-base);
+            }
+            QLabel#propertyDescription {
+                background: palette(base);
+                color: palette(window-text);
+                padding: 6px;
+                border: 1px solid palette(mid);
+            }
+            QStatusBar {
+                border-top: 1px solid palette(mid);
+            }
+        )"));
         m_styleSheetPath = path;
     }
     return false;
