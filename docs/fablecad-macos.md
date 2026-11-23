@@ -1,21 +1,21 @@
-# FableCAD su macOS
+# FableCAD on macOS
 
-## Interfaccia e pacchetto Mac
+## Interface and packaging
 
-Il progetto adotta il nome, il logo e le icone di FableCAD. Le modifiche includono la barra degli strumenti, i comandi e i pannelli di lavoro, la traduzione italiana e la configurazione del bundle macOS. Il DMG ARM64 della versione 2.2.9 è stato firmato, notarizzato da Apple e provato sul Mac di sviluppo.
+The project uses the FableCAD name, logo, and icons. This update covers the toolbars, commands, work panels, Italian localization, and macOS bundle configuration. The ARM64 DMG for version 2.2.9 was signed, notarized by Apple, and tested on the development Mac.
 
-## Apertura e salvataggio DWG
+## Opening and saving DWG files
 
-Il bridge sperimentale usa acadrust 0.6.8. Lo script `libraries/acadrust_bridge/build-experimental.sh` prepara l'eseguibile. Imposta `FABLECAD_ACADRUST_HELPER` al percorso del bridge per abilitarlo.
+The experimental bridge uses acadrust 0.6.8. Build it with `libraries/acadrust_bridge/build-experimental.sh` and set `FABLECAD_ACADRUST_HELPER` to the executable path.
 
-Il bridge conserva il documento DWG di partenza e verifica il file temporaneo prima di sostituire la destinazione. Le prove hanno coperto geometrie 2D, testi e quote, livelli, blocchi semplici e tratteggi solidi e a motivo. La conservazione delle definizioni dei blocchi dinamici è stata verificata nei campioni utilizzati. Sono stati controllati anche i dati opachi di una DATATABLE DWG 2004.
+The bridge retains the source DWG document and verifies the temporary output before replacing the destination. Tests covered 2D geometry, text, dimensions, layers, simple blocks, and solid and patterned hatches. The samples retained dynamic block definitions and the opaque DATATABLE data in a DWG 2004 file.
 
-Per AutoCAD 2020 il formato di riferimento è DWG 2018. I controlli sono stati effettuati con LibreDWG e ODA su un insieme di campioni. La verifica diretta in AutoCAD 2020 è ancora da fare.
+AutoCAD 2020 uses DWG 2018. Sample drawings were checked with LibreDWG and ODA. Direct testing in AutoCAD 2020 is pending.
 
-## Aggiornamenti
+## Updates
 
-Il controllo delle release GitHub può avvisare all'avvio o dal menu quando è disponibile un tag più recente. Su macOS, Sparkle 2 può installare un aggiornamento differenziale quando il feed offre una patch adatta alla versione installata.
+The release checker can notify users of newer GitHub releases at startup and from the menu. On macOS, Sparkle 2 can install a differential update when the feed provides a patch for the installed version.
 
-La configurazione CMake opzionale usa `FABLECAD_SPARKLE_FRAMEWORK`, `FABLECAD_SPARKLE_FEED_URL` e `FABLECAD_SPARKLE_PUBLIC_KEY`. Specifica il percorso di Sparkle.framework, l'indirizzo HTTPS dell'appcast e la chiave pubblica EdDSA.
+Set the optional CMake variables `FABLECAD_SPARKLE_FRAMEWORK`, `FABLECAD_SPARKLE_FEED_URL`, and `FABLECAD_SPARKLE_PUBLIC_KEY` to the framework path, HTTPS appcast URL, and public EdDSA key.
 
-La prova locale 2.2.9 → 2.2.10 ha verificato l'applicazione della patch, la corrispondenza del bundle risultante e il rifiuto di una patch alterata. Restano da verificare il feed HTTPS di produzione e il ciclo completo di installazione e riavvio dall'app firmata per la distribuzione.
+Local testing verified the 2.2.9 → 2.2.10 patch, confirmed that the patched bundle matched the target, and rejected a modified patch. The production HTTPS feed and the full install-and-relaunch cycle from a distribution-signed app remain to be tested.
