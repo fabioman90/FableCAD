@@ -2414,6 +2414,7 @@ if(APPLE)
             "<key>SUPublicEDKey</key><string>${FABLECAD_SPARKLE_PUBLIC_KEY}</string>
 "
             "<key>SURequireSignedFeed</key><true/>
+<key>SUVerifyUpdateBeforeExtraction</key><true/>
 "
             "<key>SUEnableAutomaticChecks</key><false/>
 "
