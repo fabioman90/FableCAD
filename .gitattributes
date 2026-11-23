@@ -1,0 +1,2 @@
+# The downstream patch matches the upstream Rust source's CRLF line endings.
+/libraries/acadrust_bridge/acadrust-0.6.8.patch -text -whitespace
