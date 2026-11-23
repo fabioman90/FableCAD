@@ -129,6 +129,10 @@ void LC_MenuFactoryMain::createHelpMenu(QMenuBar* menuBar, QList<QMenu*>& topMen
     connect(license, &QAction::triggered, m_appWin, &QC_ApplicationWindow::invokeLicenseWindow);
 
     menuHelp->QWidget::addAction(urlActionTR(tr("&Project repository"), "https://github.com/fabioman90/FableCAD"));
+    const auto checkUpdates = new QAction(tr("Check for Updates…"), m_appWin);
+    checkUpdates->setMenuRole(QAction::NoRole);
+    connect(checkUpdates, &QAction::triggered, m_appWin, &QC_ApplicationWindow::forceCheckForNewVersion);
+    menuHelp->QWidget::addAction(checkUpdates);
     menuHelp->addSeparator();
     menuHelp->QWidget::addAction(help_about);
     menuHelp->QWidget::addAction(license);
