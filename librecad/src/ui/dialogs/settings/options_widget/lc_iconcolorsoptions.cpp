@@ -27,7 +27,6 @@
 #include <QGuiApplication>
 #include <QPalette>
 #include <QRegularExpression>
-#include <QStyleHints>
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -37,23 +36,21 @@
 #include "rs_settings.h"
 
 namespace {
-    // Light-scheme template defaults — match the SVG template colors so that
-    // the icon engine's replaceColor() short-circuits and the SVG renders
-    // exactly as authored.
-    constexpr const char* DEFAULT_MAIN_LIGHT       = "#000";
-    constexpr const char* DEFAULT_ACCENT           = "#00ff7f";
+    constexpr const char* DEFAULT_MAIN_LIGHT       = "#28394a";
+    constexpr const char* DEFAULT_ACCENT_LIGHT     = "#087d76";
+    constexpr const char* DEFAULT_ACCENT_DARK      = "#6cd3c3";
     constexpr const char* DEFAULT_BACKGROUND_LIGHT = "#fff";
 
-    // Dark-scheme defaults — picked to avoid substring collisions in the
-    // engine's naive three-pass QString::replace() at lc_svgiconengine.cpp:368.
-    // Main must not contain "#fff" (would be clobbered by the BG pass);
-    // Background must not contain "#000" (would be clobbered by the Main pass).
     constexpr const char* DEFAULT_MAIN_DARK       = "#e6e6e6";
     constexpr const char* DEFAULT_BACKGROUND_DARK = "#1e1e1e";
 
     inline const char* defaultMain() {
         return LC_IconColorsOptions::isDarkColorScheme()
             ? DEFAULT_MAIN_DARK : DEFAULT_MAIN_LIGHT;
+    }
+    inline const char* defaultAccent() {
+        return LC_IconColorsOptions::isDarkColorScheme()
+            ? DEFAULT_ACCENT_DARK : DEFAULT_ACCENT_LIGHT;
     }
     inline const char* defaultBackground() {
         return LC_IconColorsOptions::isDarkColorScheme()
@@ -62,14 +59,6 @@ namespace {
 }
 // fixme - sand - probably it's better to move it so some generic util, as it will be used in several places
 bool LC_IconColorsOptions::isDarkColorScheme() {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    auto scheme = QGuiApplication::styleHints()->colorScheme();
-    if (scheme != Qt::ColorScheme::Unknown) {
-        return scheme == Qt::ColorScheme::Dark;
-    }
-    // Fall through when Qt can't tell us (some Linux platform themes,
-    // headless builds) — use palette luminance as a fallback.
-#endif
     return QGuiApplication::palette().color(QPalette::Window).lightnessF() < 0.5;
 }
 
@@ -82,7 +71,7 @@ LC_IconColorsOptions::LC_IconColorsOptions(const LC_IconColorsOptions& other) {
 void LC_IconColorsOptions::resetToDefaults() {
     m_colors.clear();
     setColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Main, defaultMain());
-    setColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Accent, DEFAULT_ACCENT);
+    setColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Accent, defaultAccent());
     setColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Background, defaultBackground());
 }
 
@@ -114,9 +103,10 @@ QString LC_IconColorsOptions::getSettingsKeyName(const LC_SVGIconEngineAPI::Icon
 void LC_IconColorsOptions::loadColor(const LC_SVGIconEngineAPI::IconMode mode, const LC_SVGIconEngineAPI::IconState state,
                                      const LC_SVGIconEngineAPI::ColorType type, const QString& defaultValue) {
     const QString settingsKey = getSettingsKeyName(mode, state, type);
-    const QString value = LC_GET_STR(settingsKey, defaultValue);
+    // Keep the cached preference independent of the current palette.
+    const QString value = LC_GET_STR(settingsKey, QString{});
     const int hashKey = iconHashKey(mode, state, type);
-    m_colors.insert(hashKey, value);
+    m_colors.insert(hashKey, value.isNull() ? defaultValue : value);
 }
 
 void LC_IconColorsOptions::saveColor(const LC_SVGIconEngineAPI::IconMode mode, const LC_SVGIconEngineAPI::IconState state,
@@ -140,7 +130,7 @@ void LC_IconColorsOptions::loadSettings() {
     LC_GROUP("UiIconsStyling");
     {
         loadColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Main, defaultMain());
-        loadColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Accent, DEFAULT_ACCENT);
+        loadColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Accent, defaultAccent());
         loadColor(LC_SVGIconEngineAPI::AnyMode, LC_SVGIconEngineAPI::AnyState, LC_SVGIconEngineAPI::ColorType::Background, defaultBackground());
 
         loadColor(LC_SVGIconEngineAPI::Active, LC_SVGIconEngineAPI::On, LC_SVGIconEngineAPI::ColorType::Main, "");

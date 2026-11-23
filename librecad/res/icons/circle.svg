@@ -1,1 +1,3 @@
-<svg height="256" viewBox="0 0 72.248892 72.248892" width="256" xmlns="http://www.w3.org/2000/svg"><circle cx="36.12439" cy="36.124447" fill="none" r="25.964447" stroke="#000" stroke-dashoffset="3.996267" stroke-linecap="round" stroke-width="2.257778"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path d="M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0z M9 12h6 M12 9v6" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

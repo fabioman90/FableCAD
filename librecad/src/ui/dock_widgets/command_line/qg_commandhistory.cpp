@@ -45,9 +45,6 @@ QG_CommandHistory::QG_CommandHistory(QWidget* parent) :
     connect(clear, &QAction::triggered, this, &QG_CommandHistory::clear);
     addAction(clear);
 
-#ifndef DONT_FORCE_WIDGETS_CSS
-    setStyleSheet("selection-color: white; selection-background-color: green;");
-#endif
 }
 
 void QG_CommandHistory::mouseReleaseEvent(QMouseEvent* event){

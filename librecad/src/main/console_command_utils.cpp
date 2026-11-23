@@ -208,7 +208,7 @@ RS2::FormatType dwgFormatForVersion(const QString& version) {
         return RS2::FormatDWG2010;
     if (normalized == "2013")
         return RS2::FormatDWG2013;
-    if (normalized == "2018")
+    if (normalized == "2018" || normalized == "2020")
         return RS2::FormatDWG2018;
 #else
     (void)version;

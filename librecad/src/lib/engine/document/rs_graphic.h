@@ -346,6 +346,8 @@ public:
     void setDxfRecoverySourceFile(const QString& file) { m_dxfRecoverySourceFile = file; }
     const QString& dxfRecoverySourceFile() const { return m_dxfRecoverySourceFile; }
     bool isDxfRecoverySourceFile(const QString& file) const;
+    const QString& dwgWorkingCopy() const { return m_dwgWorkingCopy; }
+    void setDwgWorkingCopy(const QString& file) { m_dwgWorkingCopy = file; }
 
     /**
      * @return Auto-save file name of the document currently loaded.
@@ -412,6 +414,7 @@ private:
     /** File name of the document or empty for a new document. */
     QString m_filename;
     QString m_dxfRecoverySourceFile;
+    QString m_dwgWorkingCopy;
     /** Auto-save file name of document. */
     QString m_autosaveFilename;
 

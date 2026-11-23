@@ -178,14 +178,19 @@ QString QG_FileDialog::getOpenFile(RS2::FormatType* type) {
     // read default settings:
     LC_GROUP("Paths");
     const QString defDir = LC_GET_STR("Open", RS_SYSTEM->getHomeDir());
-    const QString openFilter = LC_GET_STR("OpenFilter", fDxfrw);
+#ifdef DWGSUPPORT
+    const QString standardFilter = tr("CAD Drawings (*.dwg *.dxf)");
+#else
+    const QString& standardFilter = fDxfrw;
+#endif
+    const QString openFilter = LC_GET_STR("OpenFilter", standardFilter);
     LC_GROUP_END();
 
     RS_DEBUG->print("defDir: %s", defDir.toLatin1().data());
     QString fn = "";
     QStringList filters;
 #ifdef DWGSUPPORT
-    filters << fDxfrw << fDxf1 << fDwg << fLff << fCxf << fJww << fShp;
+    filters << standardFilter << fDxfrw << fDxf1 << fDwg << fLff << fCxf << fJww << fShp;
 #else
     filters << fDxfrw << fDxf1 << fLff << fCxf << fJww << fShp;
 #endif
@@ -194,7 +199,7 @@ QString QG_FileDialog::getOpenFile(RS2::FormatType* type) {
     setNameFilters(filters);
     setDirectory(defDir);
     setFileMode(QFileDialog::ExistingFile);
-    selectNameFilter(openFilter);
+    selectNameFilter(openFilter == fDxfrw ? standardFilter : openFilter);
     m_type = RS2::FormatDXFRW;
     RS_DEBUG->print("defFilter: %s", fDxfrw.toLatin1().data());
 
@@ -214,6 +219,12 @@ QString QG_FileDialog::getOpenFile(RS2::FormatType* type) {
         fn = QDir::toNativeSeparators(QFileInfo(fn).absoluteFilePath());
 
         m_type = getType(selectedNameFilter());
+#ifdef DWGSUPPORT
+        // A saved or native picker filter can still report DXF for a typed DWG path.
+        if (QFileInfo(fn).suffix().compare(QLatin1String("dwg"), Qt::CaseInsensitive) == 0) {
+            m_type = RS2::FormatDWG;
+        }
+#endif
         if (type != nullptr) {
             *type = m_type;
         }

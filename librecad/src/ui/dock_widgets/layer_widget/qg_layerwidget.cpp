@@ -28,6 +28,7 @@
 #include "qg_layerwidget.h"
 
 #include <QAbstractTableModel>
+#include <QApplication>
 #include <QContextMenuEvent>
 #include <QHeaderView>
 #include <QIcon>
@@ -172,8 +173,13 @@ QVariant QG_LayerModel::data( const QModelIndex & index, const int role ) const{
             }
             break;
         case Qt::BackgroundRole:
-            if (COLUMN_COLOR_SAMPLE == col) {
-                return layer->getPen().getColor().toQColor();
+            if (m_activeLayer == layer) {
+                return QApplication::palette().color(QPalette::Highlight);
+            }
+            break;
+        case Qt::ForegroundRole:
+            if (m_activeLayer == layer) {
+                return QApplication::palette().color(QPalette::HighlightedText);
             }
             break;
         case Qt::FontRole:
@@ -201,6 +207,7 @@ public:
     }
 
     void doPaint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+        QStyledItemDelegate::paint(painter, option, index);
         const int col = index.column();
         if (col  == QG_LayerModel::Columns::COLUMN_COLOR_SAMPLE) {
             const auto layer = m_model->getLayer(index.row());
@@ -215,14 +222,11 @@ public:
 
                 colorRect.adjust(leftDelta+1, 6, -rightDelta-1, -6);
 
-                painter->fillRect(colorRect, Qt::black);
+                painter->fillRect(colorRect, option.palette.color(QPalette::Mid));
                 colorRect.adjust(1, 1, -1, -1);
                 const auto color = layer->getPen().getColor();
                 painter->fillRect(colorRect, color);
             }
-        }
-        else {
-            QStyledItemDelegate::paint(painter, option, index);
         }
         const bool drawGrid = true;
         if (drawGrid) {
@@ -284,9 +288,7 @@ QG_LayerWidget::QG_LayerWidget(LC_ActionGroupManager* actionGroupManager, const 
 
     m_layerView->setShowGrid(false); // fixme - sand - add to options!*/
 
-#ifndef DONT_FORCE_WIDGETS_CSS
-    m_layerView->setStyleSheet("QWidget {background-color: white;}  QScrollBar{ background-color: none }");
-#endif
+    m_layerView->setAlternatingRowColors(true);
 
     auto* lay = new QVBoxLayout(this);
     lay->setContentsMargins(2, 1, 2, 2);

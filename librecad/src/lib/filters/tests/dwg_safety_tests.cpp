@@ -367,8 +367,11 @@ public:
     using dwgReader::restoreStagedFrame;
     using dwgReader::abandonStagedFrame;
 
-    explicit DwgHandleReaderProbe(std::unique_ptr<dwgBuffer> buffer)
-        : dwgReader15(std::move(buffer), nullptr) {}
+    explicit DwgHandleReaderProbe(std::unique_ptr<dwgBuffer> buffer,
+                                  DRW::Version fileVersion = DRW::UNKNOWNV)
+        : dwgReader15(std::move(buffer), nullptr) {
+        version = fileVersion;
+    }
 };
 
 class DwgR2018FixtureReaderProbe final : public dwgReader32 {
@@ -25553,6 +25556,51 @@ TEST_CASE("DWG handle map rejects bytes after its terminator", "[dwg][safety]") 
 
     CHECK_FALSE(reader.readDwgHandles(&mapBuffer, 0, bytes.size()));
     CHECK(reader.ObjectMap.empty());
+}
+
+TEST_CASE("DWG R2018 compressed handle maps accept bounded data after a valid terminator",
+          "[dwg][safety]") {
+    std::uint8_t dummy[] = {0};
+    DwgHandleReaderProbe reader(
+        std::make_unique<dwgBuffer>(dummy, sizeof(dummy)), DRW::AC1032);
+    auto bytes = makeHandleMap(false);
+
+    SECTION("a bounded tail contains no additional map entries") {
+        bytes.insert(bytes.end(), 2047, 0xAA);
+        dwgBuffer buffer(bytes.data(), bytes.size());
+        REQUIRE(reader.readDwgHandles(&buffer, 0, bytes.size(), 1,
+                    DwgIntegrityAddressSpace::DecodedBuffer));
+        REQUIRE(reader.ObjectMap.size() == 1);
+        CHECK(reader.ObjectMap.at(1).loc == 0);
+        REQUIRE(reader.m_integrityDiagnostics.size() == 1);
+        CHECK(reader.m_integrityDiagnostics.front().severity
+              == DwgIntegritySeverity::Warning);
+    }
+
+    SECTION("the terminator checksum must still be valid") {
+        bytes = makeHandleMap(true);
+        bytes.insert(bytes.end(), 2047, 0xAA);
+        dwgBuffer buffer(bytes.data(), bytes.size());
+        CHECK_FALSE(reader.readDwgHandles(&buffer, 0, bytes.size(), 1,
+                     DwgIntegrityAddressSpace::DecodedBuffer));
+        CHECK(reader.ObjectMap.empty());
+    }
+
+    SECTION("the exception only applies to decoded sections") {
+        bytes.insert(bytes.end(), 2047, 0xAA);
+        dwgBuffer buffer(bytes.data(), bytes.size());
+        CHECK_FALSE(reader.readDwgHandles(&buffer, 0, bytes.size(), 1,
+                     DwgIntegrityAddressSpace::PhysicalFile));
+        CHECK(reader.ObjectMap.empty());
+    }
+
+    SECTION("the tail is bounded") {
+        bytes.insert(bytes.end(), dwgSafety::MaxHandleMapGroupSize + 1, 0xAA);
+        dwgBuffer buffer(bytes.data(), bytes.size());
+        CHECK_FALSE(reader.readDwgHandles(&buffer, 0, bytes.size(), 1,
+                     DwgIntegrityAddressSpace::DecodedBuffer));
+        CHECK(reader.ObjectMap.empty());
+    }
 }
 
 TEST_CASE("DWG handle map does not read a CRC past its section",

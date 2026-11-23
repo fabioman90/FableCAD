@@ -190,18 +190,12 @@ static std::uint32_t litLen18Bytes(std::uint32_t n) {
     return (n <= 18) ? 1u : ((n - 19) / 0xFF + 2);
 }
 
-// Compress a system section as an R2004-LZ77 *literal-only* stream: one initial
-// literal run covering the whole input, no back-references. The decompressor's
-// Terminate explicitly even when the literal run fills the output window:
-// independent readers may continue until the on-disk end opcode.
-// Conformant readers UNCONDITIONALLY decompress the Section/Data Page Map
-// (libreDWG decode.c:1453); a store-mode page (compType 1) therefore decoded to
-// garbage -> wrong section addresses -> every R2004+ file libdxfrw wrote was
-// undecodable. (write-review EMPIRICAL #1 / plan 3.1)
-static std::vector<std::uint8_t> compressSysSection(const std::uint8_t* data,
+// Encode one literal run and the end opcode. Independent readers may look
+// for that opcode even after filling the decoded page.
+static std::vector<std::uint8_t> encodeLiteralPage(const std::uint8_t* data,
                                                     std::uint32_t n) {
     std::vector<std::uint8_t> out;
-    out.reserve(n + 6);
+    out.reserve(litLen18Bytes(n) + n + 3);
     putLitLen18(out, n);
     out.insert(out.end(), data, data + n);
     out.insert(out.end(), {0x11, 0, 0});
@@ -214,12 +208,12 @@ static std::vector<std::uint8_t> compressSysSection(const std::uint8_t* data,
 // Layout: +0 pageType  +4 decompSize  +8 compSize  +12 compType  +16 checksum
 //         +20 compressed data.
 // The data is R2004-LZ77-compressed (literal-only) because conformant readers
-// decompress system pages unconditionally; see compressSysSection.  The page
+// decompress system pages unconditionally; see encodeLiteralPage.  The page
 // checksum is computed over the COMPRESSED bytes (matches the reader, which
 // checksums the on-disk compressed payload).
 static std::vector<std::uint8_t> buildSysPage(std::uint32_t pageType,
                                         const std::uint8_t* data, std::uint32_t dataSz) {
-    const std::vector<std::uint8_t> comp = compressSysSection(data, dataSz);
+    const std::vector<std::uint8_t> comp = encodeLiteralPage(data, dataSz);
     const std::uint32_t compSz = static_cast<std::uint32_t>(comp.size());
 
     std::vector<std::uint8_t> pg;
@@ -243,11 +237,12 @@ static std::vector<std::uint8_t> buildSysPage(std::uint32_t pageType,
 
 // Build a data page.  The 32-byte page header is XOR-encrypted with
 // decrypt18Hdr using pageAddr as the key offset.
-// Layout: 32-byte encrypted header + data bytes (uncompressed).
+// Layout: 32-byte encrypted header followed by the stored payload.
 static std::vector<std::uint8_t> buildDataPage(std::uint64_t pageAddr,
                                          std::uint32_t sectionNum,
                                          const std::uint8_t* data,
                                          std::uint32_t dataSz,
+                                         std::uint32_t decodedSize,
                                          std::uint32_t startOffset) {
     // Build decrypted 32-byte header.
     std::uint8_t hdr[32] = {};
@@ -259,8 +254,8 @@ static std::vector<std::uint8_t> buildDataPage(std::uint64_t pageAddr,
     };
     rl( 0, 0x4163043b);  // data page type
     rl( 4, sectionNum);  // section number
-    rl( 8, dataSz);      // compressed size (= dataSz, store mode)
-    rl(12, dataSz);      // uncompressed size
+    rl( 8, dataSz);      // stored payload size, excluding alignment
+    rl(12, decodedSize); // logical page capacity
     rl(16, startOffset); // logical offset within the decompressed section
     rl(20, 0);           // unknown
     rl(24, 0);           // header checksum placeholder
@@ -776,12 +771,10 @@ bool dwgWriter18::finalize() {
         DataSectionDesc section;
         section.sectionId = sectionId;
         section.dataSize = dataSize;
-        section.maxPageSize = maxPageSize;
-        // The R2004 writer currently emits store pages only. A source
-        // compressed section is replayed as a valid store section after its
-        // decoded bytes have been captured; retaining a false compression
-        // flag would describe a payload we do not emit.
-        section.compressionType = 1;
+        section.maxPageSize = dataSize > maxPageSize ? std::max(4u, maxPageSize) : maxPageSize;
+        // Readers use the logical start offset when inflating successive LZ
+        // pages. Some readers treat stored pages as a single contiguous span.
+        section.compressionType = dataSize > section.maxPageSize ? 2 : 1;
         section.encrypted = encrypted;
         section.name = name;
         if (dataSize != 0)
@@ -802,9 +795,7 @@ bool dwgWriter18::finalize() {
                 && section.m_encoding != 4)
             || section.m_encrypted != 0)
             return false;
-        // R2004 source descriptors use 2 for compressed pages; R2007+ uses
-        // 4 for interleaved Reed-Solomon pages. This writer emits stored R2004
-        // pages, so either compressed provenance becomes encoding 1.
+        // Choose the target encoding from the decoded size and page capacity.
         const std::uint64_t containerEncoding = 1;
         const std::uint64_t requestedPageSize = section.m_maxSize != 0
             ? section.m_maxSize : dataPageSizeFor(section.m_name);
@@ -904,12 +895,16 @@ bool dwgWriter18::finalize() {
             if (nextPageId == std::numeric_limits<std::uint32_t>::max())
                 return false;
             const std::uint32_t pageId = nextPageId++;
-            dataPages.push_back(buildDataPage(
-                nextAddr, section.sectionId, pageData.data(),
-                section.maxPageSize, static_cast<std::uint32_t>(startOffset)));
-            if (dataPages.back().empty())
-                return false;
-            section.pages.push_back({pageId, section.maxPageSize, startOffset});
+            if (section.compressionType == 2)
+                pageData = encodeLiteralPage(pageData.data(), section.maxPageSize);
+            const auto storedSize = static_cast<std::uint32_t>(pageData.size());
+            dataPages.push_back(buildDataPage(nextAddr, section.sectionId,
+                pageData.data(), storedSize, section.maxPageSize,
+                static_cast<std::uint32_t>(startOffset)));
+            auto& page = dataPages.back();
+            if (section.compressionType == 2)
+                alignSectionPage(page);
+            section.pages.push_back({pageId, storedSize, startOffset});
             if (!dwgSafety::add(nextAddr,
                                 static_cast<std::uint64_t>(dataPages.back().size()),
                                 nextAddr))

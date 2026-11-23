@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.28)
-project (LibreCAD VERSION 2.2.2)
+project (LibreCAD VERSION 2.2.9)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,6 +40,9 @@ set (CMAKE_AUTORCC ON)
 add_compile_definitions(QC_APPDIR=librecad)
 add_compile_definitions (MUPARSER_STATIC)
 add_compile_definitions (LC_VERSION=2.2.2.6-alpha)
+# Share the application and bundle version without recompiling every translation unit.
+set_source_files_properties(librecad/src/main/lc_release_label.cpp PROPERTIES
+    COMPILE_DEFINITIONS "FABLECAD_VERSION=${PROJECT_VERSION}")
 add_compile_definitions (LC_PRERELEASE=true)
 add_compile_definitions (QT_USE_QSTRINGBUILDER)
 
@@ -2373,37 +2376,75 @@ qt_add_executable (librecad
                    ${MAIN_SOURCES}
 )
 
-# On macOS, produce a proper bundle: the capitalized name (LibreCAD.app with
-# Contents/MacOS/LibreCAD) used by the qmake release build, a filled-in
-# Info.plist and the app icon. The Linux binary stays lowercase "librecad".
+# Preserve the upstream target name while branding the macOS application bundle.
 if(APPLE)
-    # Info.plist.app is shared with the qmake build and uses @TOKEN@
-    # placeholders. Fill them here (configure_file @ONLY) so the bundle gets a
-    # valid name, version and icon instead of empty values. The bundle
-    # identifier is spelled out in the template itself.
-    set(ICON "librecad.icns")
-    set(EXECUTABLE "LibreCAD")
+    set(ICON "fablecad.icns")
+    set(EXECUTABLE "FableCAD")
     set(FULL_VERSION "${PROJECT_VERSION}")
     set(TYPEINFO "????")
+    set(FABLECAD_SPARKLE_FRAMEWORK "" CACHE PATH "Path to Sparkle.framework for macOS updates")
+    set(FABLECAD_SPARKLE_FEED_URL "" CACHE STRING "HTTPS URL of the signed Sparkle appcast")
+    set(FABLECAD_SPARKLE_PUBLIC_KEY "" CACHE STRING "Public Ed25519 key for Sparkle")
+    set(FABLECAD_SPARKLE_PLIST "")
+    if(FABLECAD_SPARKLE_FRAMEWORK OR FABLECAD_SPARKLE_FEED_URL OR FABLECAD_SPARKLE_PUBLIC_KEY)
+        string(LENGTH "${FABLECAD_SPARKLE_PUBLIC_KEY}" key_length)
+        if(NOT EXISTS "${FABLECAD_SPARKLE_FRAMEWORK}/Sparkle"
+           OR NOT FABLECAD_SPARKLE_FEED_URL MATCHES "^https://[a-zA-Z0-9._:/-]+$"
+           OR NOT key_length EQUAL 44
+           OR NOT FABLECAD_SPARKLE_PUBLIC_KEY MATCHES "^[a-zA-Z0-9+/]+=$")
+            message(FATAL_ERROR "Sparkle requires a valid framework, HTTPS feed and Ed25519 public key")
+        endif()
+
+        enable_language(OBJCXX)
+        find_library(FABLECAD_FOUNDATION Foundation REQUIRED)
+        set(sparkle_source librecad/src/ui/main/release_check/lc_sparkleupdater.mm)
+        target_sources(librecad_lib PRIVATE "${sparkle_source}")
+        set_source_files_properties("${sparkle_source}" PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+        target_compile_definitions(librecad_lib PRIVATE FABLECAD_SPARKLE)
+        target_link_libraries(librecad_lib PRIVATE "${FABLECAD_SPARKLE_FRAMEWORK}" "${FABLECAD_FOUNDATION}")
+        set_property(TARGET librecad APPEND PROPERTY BUILD_RPATH "@executable_path/../Frameworks")
+        set_property(TARGET librecad APPEND PROPERTY INSTALL_RPATH "@executable_path/../Frameworks")
+        add_custom_command(TARGET librecad POST_BUILD
+            COMMAND /usr/bin/ditto "${FABLECAD_SPARKLE_FRAMEWORK}"
+                "$<TARGET_BUNDLE_DIR:librecad>/Contents/Frameworks/Sparkle.framework"
+            VERBATIM)
+        string(CONCAT FABLECAD_SPARKLE_PLIST
+            "<key>SUFeedURL</key><string>${FABLECAD_SPARKLE_FEED_URL}</string>
+"
+            "<key>SUPublicEDKey</key><string>${FABLECAD_SPARKLE_PUBLIC_KEY}</string>
+"
+            "<key>SURequireSignedFeed</key><true/>
+"
+            "<key>SUEnableAutomaticChecks</key><false/>
+"
+            "<key>SUAllowsAutomaticUpdates</key><false/>")
+    endif()
+
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/librecad/src/Info.plist.app"
         "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
         @ONLY)
+    if(FABLECAD_SPARKLE_PLIST)
+        file(READ "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" fablecad_plist)
+        string(REPLACE "<!-- FABLECAD_SPARKLE_PROPERTIES -->" "${FABLECAD_SPARKLE_PLIST}"
+            fablecad_plist "${fablecad_plist}")
+        file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" CONTENT "${fablecad_plist}" @ONLY)
+    endif()
     unset(ICON)
     unset(EXECUTABLE)
     unset(FULL_VERSION)
     unset(TYPEINFO)
 
     # Copy the application icon into the bundle's Resources.
-    set(LIBRECAD_ICNS "${CMAKE_CURRENT_SOURCE_DIR}/librecad/res/images/librecad.icns")
-    set_source_files_properties("${LIBRECAD_ICNS}" PROPERTIES
+    set(FABLECAD_ICNS "${CMAKE_CURRENT_SOURCE_DIR}/librecad/res/images/fablecad.icns")
+    set_source_files_properties("${FABLECAD_ICNS}" PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources")
-    target_sources(librecad PRIVATE "${LIBRECAD_ICNS}")
+    target_sources(librecad PRIVATE "${FABLECAD_ICNS}")
 
     set_target_properties(librecad PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
-        OUTPUT_NAME LibreCAD
+        OUTPUT_NAME FableCAD
     )
 endif()
 
@@ -2511,7 +2552,7 @@ set(TS_FILES
 )
 
 if(APPLE)
-    set(LIBRECAD_DATA_INSTALL_DIR "bin/LibreCAD.app/Contents/Resources")
+    set(LIBRECAD_DATA_INSTALL_DIR "bin/FableCAD.app/Contents/Resources")
 elseif(WIN32)
     set(LIBRECAD_DATA_INSTALL_DIR "bin/resources")
 else()

@@ -23,53 +23,27 @@
 
 #include <QClipboard>
 #include <QMimeData>
-#include <QPainter>
+#include <QIcon>
 #include <memory>
 #include <boost/version.hpp>
 
 #include "main.h"
-#include "qc_applicationwindow.h"
 #include "ui_lc_dlgabout.h"
 
 #if defined(Q_OS_LINUX)
 #include <QThread>
 #endif
 
-namespace {
-void aboutImageLabels(QLabel* label) {
-    if (label == nullptr) {
-        return;
-    }
-
-    const QString versionLabel = LCReleaseLabel();
-    label->setPixmap(QPixmap{":images/librecad01_" + versionLabel.toLower() + ".png"});
-    QPixmap pixmap = label->pixmap();  // Create a mutable copy
-
-    QPainter painter(&pixmap);
-    const double factorX = pixmap.width() / 551.;
-    const double factorY = pixmap.height() / 171.;
-    painter.setPen(QColor(255, 0, 0, 128));
-    const QRectF labelRect{QPointF{280. * factorX, 125. * factorY}, QPointF{480. * factorX, 165. * factorY}};
-    QFont font;
-    font.setPixelSize(static_cast<int>(labelRect.height()) - 2);
-    painter.setFont(font);
-    painter.drawText(labelRect, Qt::AlignRight, versionLabel);
-
-    label->setPixmap(pixmap);  // Set the modified pixmap back
-}
-}
-
 LC_DlgAbout::LC_DlgAbout(QWidget *parent)
     : LC_Dialog(parent, "About")
     , ui(std::make_unique<Ui::LC_DlgAbout>()){
     ui->setupUi(this);
-    const auto* appWindow = static_cast<QC_ApplicationWindow*>(parent);
 
     // Compiler macro list in Qt source tree
     // Src/qtbase/src/corelib/global/qcompilerdetection.h
 
     m_info = QString(
-        tr("Version: <b>%1</b>").arg(XSTR(LC_VERSION)) + "<br/>" +
+        tr("Version: <b>%1</b>").arg(LCVersion()) + "<br/>" +
 #if defined(Q_CC_CLANG)
         tr("Compiler: Clang %1.%2.%3").arg(__clang_major__).arg(__clang_minor__).arg(__clang_patchlevel__) + "<br/>" +
 #elif defined(Q_CC_GNU)
@@ -86,19 +60,13 @@ LC_DlgAbout::LC_DlgAbout(QWidget *parent)
     ui->lVersionInfo->setText(m_info);
 
 
-    ui->lLinks->setText(QString(R"(<a href="https://github.com/LibreCAD/LibreCAD/graphs/contributors">%1</a>)"
-                                "<br/>"
-                                R"(<a href="https://github.com/LibreCAD/LibreCAD/blob/master/LICENSE">%2</a>)"
-                                "<br/>"
-                                R"(<a href="https://github.com/LibreCAD/LibreCAD/">%3</a>)")
-                            .arg(tr("Contributors"))
-                            .arg(tr("License"))
-                            .arg(tr("The Code")));
+    ui->lLinks->setText(QString(R"(<a href="https://github.com/fabioman90/FableCAD">%1</a><br/>)"
+                                R"(<a href="https://github.com/LibreCAD/LibreCAD/blob/master/LICENSE">%2</a><br/>)"
+                                R"(<a href="https://github.com/LibreCAD/LibreCAD/graphs/contributors">%3</a>)")
+                            .arg(tr("The Code"), tr("License"), tr("LibreCAD contributors")));
 
-    aboutImageLabels(ui->lblLogo);
-
+    ui->lblLogo->setPixmap(QIcon(":/images/fablecad.svg").pixmap(QSize(84, 84)));
     connect(ui->pbCopy, &QPushButton::clicked, this, &LC_DlgAbout::copyInfo);
-    connect(ui->pbCheckNewVersion, &QPushButton::clicked, appWindow, &QC_ApplicationWindow::forceCheckForNewVersion);
 }
 
 LC_DlgAbout::~LC_DlgAbout() = default;

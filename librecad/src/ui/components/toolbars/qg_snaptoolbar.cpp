@@ -109,6 +109,12 @@ QG_SnapToolBar::QG_SnapToolBar(QWidget* parent, QG_ActionHandler* ah, const LC_A
     m_actionRestrictHorizontal = addOwnAction("RestrictHorizontal", actionsMap);
     m_actionRestrictVertical = addOwnAction("RestrictVertical", actionsMap);
     m_actionRestrictOrthogonal = justAddAction("RestrictOrthogonal", actionsMap);
+    if (auto* button = qobject_cast<QToolButton*>(widgetForAction(m_actionRestrictOrthogonal))) {
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        const auto updateLabel = [button] { button->setText(tr("Ortho")); };
+        updateLabel();
+        connect(m_actionRestrictOrthogonal, &QAction::changed, button, updateLabel);
+    }
     connect(m_actionRestrictOrthogonal, &QAction::triggered, this, &QG_SnapToolBar::slotRestrictOrthogonal);
     // Default shortcut for AutoCAD compatibility (F8). Still fully configurable in Options -> Keyboard Shortcuts.
     m_actionRestrictNothing = justAddAction("RestrictNothing", actionsMap);
@@ -196,7 +202,6 @@ RS_SnapMode QG_SnapToolBar::getSnaps() const {
     s.snapMiddle = m_actionSnapMiddle->isChecked();
     s.snapDistance = m_actionSnapDistance->isChecked();
     s.snapIntersection = m_actionSnapIntersection->isChecked();
-    // removed Restrict Othogonal button
     // todo simplify internal restrict rules
     const int rH = (m_actionRestrictHorizontal != nullptr && m_actionRestrictHorizontal->isChecked()) ? 1 : 0;
     const int rV = (m_actionRestrictVertical != nullptr && m_actionRestrictVertical->isChecked()) ? 2 : 0;

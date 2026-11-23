@@ -268,14 +268,12 @@ void QG_CommandWidget::setActionHandler(QG_ActionHandler* ah) {
 
 void QG_CommandWidget::setCommandMode() const {
     QPalette palette;
-    palette.setColor(lCommand->foregroundRole(), Qt::blue);
+    palette.setColor(lCommand->foregroundRole(), palette.color(QPalette::Link));
     lCommand->setPalette(palette);
 }
 
 void QG_CommandWidget::setNormalMode() const {
-    QPalette palette;
-    palette.setColor(lCommand->foregroundRole(), Qt::black);
-    lCommand->setPalette(palette);
+    lCommand->setPalette(QPalette{});
 }
 
 QString QG_CommandWidget::getRootCommand(const QStringList& cmdList, const QString& typed) {

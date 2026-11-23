@@ -28,8 +28,16 @@
 
 #include <QObject>
 
+const char* LCVersion() {
+#ifdef FABLECAD_VERSION
+    return XSTR(FABLECAD_VERSION);
+#else
+    return XSTR(LC_VERSION);
+#endif
+}
+
 QString LCReleaseLabel() {
-    const QString version{XSTR(LC_VERSION)};
+    const QString version{LCVersion()};
     const std::map<QString, QString> labelMap = {
         {"rc", QObject::tr("Release Candidate")},
         {"beta", QObject::tr("BETA")},

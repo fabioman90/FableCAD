@@ -1978,6 +1978,29 @@ CadValueReadResult readCadValue(
         }
         case 4: {
             UTF8STRING text;
+            // Some R2007+ writers store CAD value strings as length-
+            // prefixed UTF-16LE in the body, rather than as detached text.
+            // Probe independently so the ordinary representation is still
+            // available if this is not a bounded, terminated string.
+            if (detachedStrings) {
+                auto inlineValue = buf->forkIndependent();
+                std::int32_t byteCount = 0;
+                std::vector<std::uint8_t> bytes;
+                if (readBitLongWithinBody(&inlineValue, version, bodySize, byteCount)
+                    && byteCount >= 2 && (byteCount % 2) == 0
+                    && readBinaryBytesWithinBody(&inlineValue, version, bodySize,
+                                                bytes, byteCount, kMaxCadValueBytes)
+                    && bytes[bytes.size()-1] == 0 && bytes[bytes.size()-2] == 0) {
+                    DRW_ConvUTF16 decoder;
+                    text = decoder.toUtf8(std::string_view(
+                        reinterpret_cast<const char*>(bytes.data()), bytes.size()-2));
+                    if (text.find('\0') == std::string::npos) {
+                        *buf = inlineValue;
+                        value.m_value.addString(1,text);
+                        break;
+                    }
+                }
+            }
             if (!readText(text))
                 return CadValueReadResult::Error;
             value.m_value.addString(1, text);
@@ -2897,92 +2920,115 @@ bool DRW_Dimstyle::parseCode(int code, const std::unique_ptr<dxfReader>& reader)
     return true;
 }
 
-// Populate the vars map from the parsed struct fields using EXACTLY the $DIM
-// keys / DXF codes the LibreCAD createDimStyle consumer reads. Idempotent: the
-// `if (!get(key))` guard never clobbers a value already present (DWG override
-// path or DXF group-105 handles). (Phase 3A.0)
-void DRW_Dimstyle::syncStructToVars() {
-    auto addDouble = [&](const char* key, int code, double value) {
-        if (!get(key)) add(key, code, value);
-    };
-    auto addInt = [&](const char* key, int code, int value) {
-        if (!get(key)) add(key, code, value);
-    };
-    auto addStr = [&](const char* key, int code, const std::string& value) {
-        if (!get(key)) add(key, code, value);
-    };
-
+namespace {
+template<typename Visitor>
+void visitDimstyleFields(DRW_Dimstyle& style, Visitor field) {
     // Doubles.
-    addDouble("$DIMSCALE", 40, dimscale);
-    addDouble("$DIMASZ", 41, dimasz);
-    addDouble("$DIMEXO", 42, dimexo);
-    addDouble("$DIMEXE", 44, dimexe);
-    addDouble("$DIMFXL", 49, dimfxl);
-    addDouble("$DIMDLE", 46, dimdle);
-    addDouble("$DIMDLI", 43, dimdli);
-    addDouble("$DIMGAP", 147, dimgap);
-    addDouble("$DIMTXT", 140, dimtxt);
-    addDouble("$DIMTVP", 145, dimtvp);
-    addDouble("$DIMRND", 45, dimrnd);
-    addDouble("$DIMALTRND", 148, dimaltrnd);
-    addDouble("$DIMCEN", 141, dimcen);
-    addDouble("$DIMTM", 48, dimtm);
-    addDouble("$DIMTP", 47, dimtp);
-    addDouble("$DIMTFAC", 146, dimtfac);
-    addDouble("$DIMTSZ", 142, dimtsz);
-    addDouble("$DIMLFAC", 144, dimlfac);
-    addDouble("$DIMALTF", 143, dimaltf);
+    field("$DIMSCALE", 40, style.dimscale);
+    field("$DIMASZ", 41, style.dimasz);
+    field("$DIMEXO", 42, style.dimexo);
+    field("$DIMEXE", 44, style.dimexe);
+    field("$DIMFXL", 49, style.dimfxl);
+    field("$DIMDLE", 46, style.dimdle);
+    field("$DIMDLI", 43, style.dimdli);
+    field("$DIMGAP", 147, style.dimgap);
+    field("$DIMTXT", 140, style.dimtxt);
+    field("$DIMTVP", 145, style.dimtvp);
+    field("$DIMRND", 45, style.dimrnd);
+    field("$DIMALTRND", 148, style.dimaltrnd);
+    field("$DIMCEN", 141, style.dimcen);
+    field("$DIMTM", 48, style.dimtm);
+    field("$DIMTP", 47, style.dimtp);
+    field("$DIMTFAC", 146, style.dimtfac);
+    field("$DIMTSZ", 142, style.dimtsz);
+    field("$DIMLFAC", 144, style.dimlfac);
+    field("$DIMALTF", 143, style.dimaltf);
+
+    field("$DIMJOGANG", 50, style.dimjogang);
 
     // Ints.
-    addInt("$DIMSOXD", 175, dimsoxd);
-    addInt("$DIMSAH", 173, dimsah);
-    addInt("$DIMFXLON", 290, dimfxlon);
-    addInt("$DIMSE1", 75, dimse1);
-    addInt("$DIMSE2", 76, dimse2);
-    addInt("$DIMTOFL", 172, dimtofl);
-    addInt("$DIMTOH", 74, dimtoh);
-    addInt("$DIMTIH", 73, dimtih);
-    addInt("$DIMJUST", 280, dimjust);
-    addInt("$DIMTAD", 77, dimtad);
-    addInt("$DIMTIX", 174, dimtix);
-    addInt("$DIMUPT", 288, dimupt);
-    addInt("$DIMTMOVE", 279, dimtmove);
-    addInt("$DIMATFIT", 289, dimatfit);
-    addInt("$DIMZIN", 78, dimzin);
-    addInt("$DIMAZIN", 79, dimazin);
-    addInt("$DIMTZIN", 284, dimtzin);
-    addInt("$DIMALTZ", 285, dimaltz);
-    addInt("$DIMALTTZ", 286, dimaltttz);
-    addInt("$DIMLUNIT", 277, dimlunit);
-    addInt("$DIMDSEP", 278, dimdsep);
-    addInt("$DIMDEC", 271, dimdec);
-    addInt("$DIMALT", 170, dimalt);
-    addInt("$DIMALTU", 273, dimaltu);
-    addInt("$DIMALTD", 171, dimaltd);
-    addInt("$DIMAUNIT", 275, dimaunit);
-    addInt("$DIMADEC", 179, dimadec);
-    addInt("$DIMFRAC", 276, dimfrac);
-    addInt("$DIMTDEC", 272, dimtdec);
-    addInt("$DIMALTTD", 274, dimalttd);
-    addInt("$DIMTOL", 71, dimtol);
-    addInt("$DIMTOLJ", 283, dimtolj);
-    addInt("$DIMLIM", 72, dimlim);
-    addInt("$DIMLWD", 371, dimlwd);
-    addInt("$DIMLWE", 372, dimlwe);
-    addInt("$DIMTXTDIRECTION", 295, dimtxtdirection);
+    field("$DIMSOXD", 175, style.dimsoxd);
+    field("$DIMSAH", 173, style.dimsah);
+    field("$DIMFXLON", 290, style.dimfxlon);
+    field("$DIMSE1", 75, style.dimse1);
+    field("$DIMSE2", 76, style.dimse2);
+    field("$DIMTOFL", 172, style.dimtofl);
+    field("$DIMTOH", 74, style.dimtoh);
+    field("$DIMTIH", 73, style.dimtih);
+    field("$DIMJUST", 280, style.dimjust);
+    field("$DIMTAD", 77, style.dimtad);
+    field("$DIMTIX", 174, style.dimtix);
+    field("$DIMUPT", 288, style.dimupt);
+    field("$DIMTMOVE", 279, style.dimtmove);
+    field("$DIMATFIT", 289, style.dimatfit);
+    field("$DIMZIN", 78, style.dimzin);
+    field("$DIMAZIN", 79, style.dimazin);
+    field("$DIMTZIN", 284, style.dimtzin);
+    field("$DIMALTZ", 285, style.dimaltz);
+    field("$DIMALTTZ", 286, style.dimaltttz);
+    field("$DIMLUNIT", 277, style.dimlunit);
+    field("$DIMDSEP", 278, style.dimdsep);
+    field("$DIMDEC", 271, style.dimdec);
+    field("$DIMALT", 170, style.dimalt);
+    field("$DIMALTU", 273, style.dimaltu);
+    field("$DIMALTD", 171, style.dimaltd);
+    field("$DIMAUNIT", 275, style.dimaunit);
+    field("$DIMADEC", 179, style.dimadec);
+    field("$DIMFRAC", 276, style.dimfrac);
+    field("$DIMTDEC", 272, style.dimtdec);
+    field("$DIMALTTD", 274, style.dimalttd);
+    field("$DIMTOL", 71, style.dimtol);
+    field("$DIMTOLJ", 283, style.dimtolj);
+    field("$DIMLIM", 72, style.dimlim);
+    field("$DIMLWD", 371, style.dimlwd);
+    field("$DIMLWE", 372, style.dimlwe);
+    field("$DIMTXTDIRECTION", 295, style.dimtxtdirection);
     // Color ints — createDimStyle calls numberToColor(var->i_val()).
-    addInt("$DIMCLRD", 176, dimclrd);
-    addInt("$DIMCLRE", 177, dimclre);
-    addInt("$DIMCLRT", 178, dimclrt);
+    field("$DIMCLRD", 176, style.dimclrd);
+    field("$DIMCLRE", 177, style.dimclre);
+    field("$DIMCLRT", 178, style.dimclrt);
+
+    field("$DIMTFILL", 69, style.dimtfill);
+    field("$DIMTFILLCLR", 70, style.dimtfillclr);
+    field("$DIMARCSYM", 90, style.dimarcsym);
+    field("$DIMSD1", 281, style.dimsd1);
+    field("$DIMSD2", 282, style.dimsd2);
 
     // Strings.
-    addStr("$DIMPOST", 3, dimpost);
-    addStr("$DIMAPOST", 4, dimapost);
-    addStr("$DIMTXSTY", 340, dimtxsty);   // NAME; consumer runs prepareTextStyleName
-    addStr("$DIMLDRBLK", 341, dimldrblk);
-    addStr("$DIMBLK", 5, dimblk);
-    addStr("$DIMBLK1", 6, dimblk1);
-    addStr("$DIMBLK2", 7, dimblk2);
+    field("$DIMPOST", 3, style.dimpost);
+    field("$DIMAPOST", 4, style.dimapost);
+    field("$DIMTXSTY", 340, style.dimtxsty);   // NAME; consumer runs prepareTextStyleName
+    field("$DIMLDRBLK", 341, style.dimldrblk);
+    field("$DIMBLK", 5, style.dimblk);
+    field("$DIMBLK1", 6, style.dimblk1);
+    field("$DIMBLK2", 7, style.dimblk2);
+}
+
+} // namespace
+
+void DRW_Dimstyle::syncStructToVars() {
+    visitDimstyleFields(*this, [this](const char* key, int code, const auto& value) {
+        if (!get(key))
+            add(key, code, value);
+    });
+}
+
+void DRW_Dimstyle::applyVariablesForDwg() {
+    visitDimstyleFields(*this, [this](const char* key, int, auto& field) {
+        const auto* value = get(key);
+        if (!value)
+            return;
+        using Field = std::decay_t<decltype(field)>;
+        if constexpr (std::is_same_v<Field, double>) {
+            if (value->type() == DRW_Variant::DOUBLE)
+                field = value->d_val();
+        } else if constexpr (std::is_same_v<Field, int>) {
+            if (value->type() == DRW_Variant::INTEGER)
+                field = value->i_val();
+        } else if (value->type() == DRW_Variant::STRING) {
+            field = value->c_str();
+        }
+    });
 }
 
 bool DRW_Dimstyle::parseDwg(DRW::Version version, dwgBuffer *buf, std::uint32_t bs){
@@ -6862,8 +6908,9 @@ bool DRW_Dimstyle::encodeDwg(DRW::Version version, dwgBufferW *buf,
     buf->putSBitShort(static_cast<std::int16_t>(dimlwe));
     buf->putBit(0); // flag0, the final bit of the table-record flags field
 
-    hb->putHandle(makeRefW(kDimstyleControl, DRW::DwgSoftPointer));
-    hb->putHandle(makeRefW(0, DRW::DwgSoftPointer));
+    putCommonObjectHandlePrefix(hb, kDimstyleControl,
+                                static_cast<std::int32_t>(reactorHandles.size()),
+                                xDictFlag, &reactorHandles, xDictHandle);
     hb->putHandle(makeRefW(0, DRW::DwgHardPointer)); // external-reference block
     hb->putHandle(makeRefW(dimtxstyH.ref, DRW::DwgHardPointer));
     if (version >= DRW::AC1015) {

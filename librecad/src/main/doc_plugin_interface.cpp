@@ -1321,7 +1321,7 @@ bool Doc_plugin_interface::getInt(int* num, const QString& message, const QStrin
         msg = message;
     }
     if (title.isEmpty()) {
-        tit = QObject::tr("LibreCAD query");
+        tit = QObject::tr("FableCAD query");
     }
     else {
         tit = title;
@@ -1343,7 +1343,7 @@ bool Doc_plugin_interface::getReal(qreal* num, const QString& message, const QSt
         msg = message;
     }
     if (title.isEmpty()) {
-        tit = QObject::tr("LibreCAD query");
+        tit = QObject::tr("FableCAD query");
     }
     else {
         tit = title;
@@ -1366,7 +1366,7 @@ bool Doc_plugin_interface::getString(QString* txt, const QString& message, const
         msg = message;
     }
     if (title.isEmpty()) {
-        tit = QObject::tr("LibreCAD query");
+        tit = QObject::tr("FableCAD query");
     }
     else {
         tit = title;

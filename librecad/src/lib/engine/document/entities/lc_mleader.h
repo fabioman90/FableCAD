@@ -111,6 +111,10 @@ public:
     RS2::EntityType rtti() const override { return RS2::EntityMLeader; }
 
     const LC_MLeaderData &getData() const { return m_data; }
+    void setResolvedBlockName(const QString &name) {
+        m_data.blockName = name;
+        calculateBorders();
+    }
     const std::vector<LC_MLeaderRoot> &getRoots() const { return m_data.roots; }
     QString getStyleName() const { return m_data.styleName; }
 

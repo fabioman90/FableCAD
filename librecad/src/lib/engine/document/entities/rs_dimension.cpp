@@ -265,8 +265,9 @@ QString RS_Dimension::getLabel(const bool resolve) {
         // Issue #1953: support expressions of measured
         // {<>*<>} for the squared value
         // {sqrt(<>)} for the square root
+        ret = m_dimGenericData.text;
         if (okay) {
-            ret = functionalText(m_dimGenericData.text, measured);
+            ret = functionalText(ret, measured);
         }
         ret = ret.replace(QString("<>"), measuredStr);
     }

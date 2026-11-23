@@ -23,9 +23,18 @@
 
 #include "lc_releasechecker.h"
 
+#ifdef FABLECAD_SPARKLE
+#include "lc_sparkleupdater.h"
+#endif
+
 #include <QDesktopServices>
 #include <QJsonArray>
-#include <qjsondocument.h>
+#include <QJsonDocument>
+#include <QJsonObject>
+
+#include <QRegularExpression>
+#include <algorithm>
+#include <utility>
 
 #include "rs_debug.h"
 #include "rs_dialogfactory.h"
@@ -136,27 +145,27 @@ LC_ReleaseInfo LC_ReleaseChecker::getOwnReleaseInfo(const QString& tagName, cons
     return result;
 }
 
-#define TEST_JSON_PARSING_
-
 void LC_ReleaseChecker::checkForNewVersion(const bool forceCheck) {
+#ifdef FABLECAD_SPARKLE
+    if (LC_SparkleUpdater::check(forceCheck, LC_GET_ONE_BOOL("Startup", "CheckForNewVersions", true)))
+        return;
+#endif
     if (runsFromStorePackage()) {
-        // the Store updates this copy; its Updates and downloads page checks
-        if (forceCheck) {
+        if (forceCheck)
             QDesktopServices::openUrl(QUrl(QStringLiteral("ms-windows-store://downloadsandupdates")));
-        }
         return;
     }
-#ifndef TEST_JSON_PARSING
-    m_emitSignalIfNoNewVersion = forceCheck;
-    const QUrl gitHubReleasesUrl("https://api.github.com/repos/LibreCAD/LibreCAD/releases");
-    const QNetworkRequest request(gitHubReleasesUrl);
+    m_emitSignalIfNoNewVersion |= forceCheck;
+    for (const auto* reply : m_webCtrl.findChildren<QNetworkReply*>()) {
+        if (reply->isRunning())
+            return;
+    }
+
+    QNetworkRequest request(QUrl(QStringLiteral("https://api.github.com/repos/fabioman90/FableCAD/releases")));
+    request.setRawHeader("Accept", "application/vnd.github+json");
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::SameOriginRedirectPolicy);
+    request.setTransferTimeout(15000);
     m_webCtrl.get(request);
-#else
-    QFile file = QFile("c:/Local/LibreCADProjects/releases.json"); file.open(QIODevice::ReadOnly | QIODevice::Text); QByteArray
-        responseContent = file.readAll(); file.close(); QString resultStr = QString(responseContent);
-    //    LC_ERR << resultStr;
-    processReleasesJSON(responseContent);
-#endif
 }
 
 void LC_ReleaseChecker::infoReceived(QNetworkReply* reply) {
@@ -166,186 +175,91 @@ void LC_ReleaseChecker::infoReceived(QNetworkReply* reply) {
         processReleasesJSON(responseContent);
     }
     else {
+        m_emitSignalIfNoNewVersion = false;
         warnUpdateCheckFailedOnce(reply->errorString());
     }
     reply->deleteLater();
 }
 
 LC_TagInfo LC_ReleaseChecker::parseTagInfo(const QString& tagName) const {
-    const QStringList& split = tagName.split(".");
-    const qsizetype partsSize = split.size();
-    int major = 0;
-    int minor = 0;
-    int revision = 0;
-    int bugfix = 0;
-    QString label = "";
-    if (partsSize > 1) {
-        major = split[0].toInt();
-        minor = split[1].toInt();
-        if (partsSize == 3) {
-            const QString remaining = split[2];
-            QStringList other = remaining.split("_");
-            if (other.size() == 1) {
-                other = remaining.split("-");
-            }
-            if (other.size() == 1) {
-                bool ok = false;
-                revision = remaining.toInt(&ok);
-                if (!ok) {
-                    label = remaining;
-                }
-            }
-            else if (other.size() == 2) {
-                revision = other[0].toInt();
-                label = other[1];
-            }
-        }
-        else if (partsSize == 4) {
-            revision = split[2].toInt();
-            const QString remaining = split[3];
-            QStringList other = remaining.split("_");
-            if (other.size() == 1) {
-                other = remaining.split("-");
-            }
-            if (other.size() == 1) {
-                bool ok = false;
-                bugfix = remaining.toInt(&ok);
-                if (!ok) {
-                    label = remaining;
-                }
-            }
-            else if (other.size() == 2) {
-                bugfix = other[0].toInt();
-                label = other[1];
-            }
-        }
+    static const QRegularExpression version(
+        QStringLiteral(R"(\Av?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?(?:[-_]([A-Za-z0-9][A-Za-z0-9._-]*))?\z)"));
+    const auto match = version.match(tagName);
+    if (!match.hasMatch())
+        return {};
+
+    int parts[4]{};
+    for (int i = 0; i < 4; ++i) {
+        const auto component = match.captured(i + 1);
+        if (component.isEmpty())
+            continue;
+        bool valid = false;
+        parts[i] = component.toInt(&valid);
+        if (!valid)
+            return {};
     }
-    auto result = LC_TagInfo(major, minor, revision, bugfix, label, tagName);
-    return result;
+    return {parts[0], parts[1], parts[2], parts[3], match.captured(5), tagName};
 }
 
 void LC_ReleaseChecker::processReleasesJSON(const QByteArray& responseContent) {
+    const bool manualCheck = std::exchange(m_emitSignalIfNoNewVersion, false);
+    m_latestRelease = {};
+    m_latestPreRelease = {};
+
     QJsonParseError error;
-    QJsonDocument jsonDocument = QJsonDocument::fromJson(responseContent, &error);
-    if (jsonDocument.isEmpty()) {
-        // fixme - sand - and this is acutually bad idea to ignore format error silently...
-        warnUpdateCheckFailedOnce(QStringLiteral("unable to parse response from the server: %1")
-                                  .arg(error.errorString()));
+    const auto document = QJsonDocument::fromJson(responseContent, &error);
+    if (!document.isArray()) {
+        warnUpdateCheckFailedOnce(error.error == QJsonParseError::NoError
+            ? QStringLiteral("unexpected release feed format") : error.errorString());
+        return;
     }
-    else {
-        if (jsonDocument.isArray()) {
-            QJsonArray array = jsonDocument.array();
-            QVector<LC_ReleaseInfo> releases;
-            QVector<LC_ReleaseInfo> preReleases;
-            LC_TagInfo ownTagInfo = m_ownReleaseInfo.getTagInfo();
-            LC_GROUP_GUARD("Startup");
-            bool ignorePreReleases = LC_GET_BOOL("IgnorePreReleaseVersions", true);
-            QString ignoredReleaseTagStr = LC_GET_STR("IgnoredRelease", "0.0.0.0");
-            QString ignoredPreReleaseTag = LC_GET_STR("IgnoredPreRelease", "0.0.0.0");
 
-            LC_TagInfo ignoredRelease = parseTagInfo(ignoredReleaseTagStr);
-            LC_TagInfo ignoredPreRelease = parseTagInfo(ignoredPreReleaseTag);
-            if (m_ownReleaseInfo.m_isPrerelease) {
-                ignorePreReleases = false;
-            }
+    LC_GROUP_GUARD("Startup");
+    const bool ignorePreReleases = !m_ownReleaseInfo.m_isPrerelease &&
+        LC_GET_BOOL("IgnorePreReleaseVersions", true);
+    const auto ignoredRelease = parseTagInfo(LC_GET_STR("IgnoredRelease", "0.0.0.0"));
+    const auto ignoredPreRelease = parseTagInfo(LC_GET_STR("IgnoredPreRelease", "0.0.0.0"));
+    const auto ownVersion = m_ownReleaseInfo.getTagInfo();
+    QVector<LC_ReleaseInfo> stable, previews;
+    for (const auto& value : document.array()) {
+        const auto release = value.toObject();
+        if (!release["draft"].isBool() || !release["prerelease"].isBool() ||
+            release["draft"].toBool())
+            continue;
 
-            for (const QJsonValue& value : std::as_const(array)) {
-                const QString& tagName = value["tag_name"].toString();
-                const bool draft = value["draft"].toBool();
-                const bool prerelease = value["prerelease"].toBool();
-                const QString& publishedAt = value["published_at"].toString();
-                const QString& body = value["body"].toString();
-                const QString& htmlUrl = value["html_url"].toString();
+        const auto tag = parseTagInfo(release["tag_name"].toString());
+        if (ownVersion.getTagName().isEmpty() || tag.getTagName().isEmpty() || !ownVersion.isBefore(tag))
+            continue;
 
-                LC_TagInfo tagInfo = parseTagInfo(tagName);
+        const bool prerelease = release["prerelease"].toBool() || !tag.getLabel().isEmpty();
+        if (prerelease && ignorePreReleases)
+            continue;
+        const auto& ignored = prerelease ? ignoredPreRelease : ignoredRelease;
+        if (!ignored.isBefore(tag))
+            continue;
 
-                //                LC_ERR << tagName << " as  | " << tagInfo.major << "." << tagInfo.minor << "." << tagInfo.revision << "." << tagInfo.bugfix<< "-" << tagInfo.label;
-
-                auto releaseInfo = LC_ReleaseInfo(publishedAt, draft, prerelease, htmlUrl, body);
-                releaseInfo.setTagInfo(tagInfo);
-                // first, filter everything by version numbers
-                if (ownTagInfo.isBefore(tagInfo)) {
-                    // also, if needed, skip pre-release builds
-                    if (prerelease) {
-                        if (ignorePreReleases) {
-                            //                            LC_ERR << "Skipped as ignored pre-release";
-                            continue;
-                        }
-                        if (tagInfo.isBefore(ignoredPreRelease)) {
-                            //                            LC_ERR << "Skipped as before current";
-                            continue;
-                        }
-                        preReleases << releaseInfo;
-                    }
-                    else {
-                        if (tagInfo.isBefore(ignoredRelease)) {
-                            //                            LC_ERR << "Skipped as before ignored";
-                            continue;
-                        }
-                        releases << releaseInfo;
-                    }
-                }
-                //              LC_ERR << publishedAt << " - as - " << releaseInfo.publishedDate.toString(Qt::ISODate);
-            }
-
-            qsizetype availableReleases = releases.size();
-            qsizetype availablePreReleases = preReleases.size();
-
-            // it might be that there are several releases with the same version but different suffix (i.e - latest).
-            // for sure, in order to distinguish them it's more reliable to check and compare release dates.
-            // however, that will require additional magic with embedding release date (similar to LC_Version), so
-            // we can avoid such situations just by proper numbering of releases. In other words, each version should be
-            // unique (say, different by last "revision" component of version number.
-
-            if (availableReleases > 0) {
-                sortReleasesInfo(releases);
-                //                LC_ERR << availableReleases;
-                LC_ReleaseInfo& info = releases.last();
-                if (!info.getTagInfo().isSameVersion(ignoredRelease) && !info.getTagInfo().isSameVersion(ownTagInfo)) {
-                    m_latestRelease = info;
-                }
-                else {
-                    m_latestRelease.m_valid = false;
-                    availableReleases = 0;
-                }
-            }
-            //            LC_ERR << "=======";
-            if (availablePreReleases > 0) {
-                sortReleasesInfo(preReleases);
-                //                LC_ERR << availablePreReleases;
-                LC_ReleaseInfo& info = preReleases.last();
-                if (!info.getTagInfo().isSameVersion(ignoredPreRelease) && !info.getTagInfo().isSameVersion(ownTagInfo)) {
-                    m_latestPreRelease = info;
-                }
-                else {
-                    m_latestRelease.m_valid = false;
-                    availablePreReleases = 0;
-                }
-            }
-            if (availableReleases > 0 || availablePreReleases > 0 || m_emitSignalIfNoNewVersion) {
-                emit updatesAvailable();
-                m_emitSignalIfNoNewVersion = false;
-            }
-        }
+        const auto url = QStringLiteral("https://github.com/fabioman90/FableCAD/releases/tag/") + tag.getTagName();
+        LC_ReleaseInfo candidate(release["published_at"].toString(), false, prerelease, url, {});
+        candidate.setTagInfo(tag);
+        (prerelease ? previews : stable).append(candidate);
     }
+    sortReleasesInfo(stable);
+    sortReleasesInfo(previews);
+    if (!stable.isEmpty())
+        m_latestRelease = stable.last();
+    if (!previews.isEmpty())
+        m_latestPreRelease = previews.last();
+
+    if (m_latestRelease.isValid() || m_latestPreRelease.isValid() || manualCheck)
+        emit updatesAvailable();
 }
 
-void LC_ReleaseChecker::sortReleasesInfo(QVector<LC_ReleaseInfo>& list) const {
-    std::sort(list.begin(), list.end(), [](const LC_ReleaseInfo& v0, const LC_ReleaseInfo& v1) {
-        bool result = v0.m_tagInfo.isSameVersion(v1.m_tagInfo);
-        if (result) {
-            // if releases has the same version (mostly pre-releases) - just sort them by date and use the freshest one
-            result = v1.m_publishedDate < v0.m_publishedDate;
-        }
-        else {
-            result = v0.m_tagInfo.isBefore(v1.m_tagInfo);
-        }
-
-        return result;
+void LC_ReleaseChecker::sortReleasesInfo(QVector<LC_ReleaseInfo>& releases) const {
+    std::sort(releases.begin(), releases.end(), [](const auto& left, const auto& right) {
+        const auto& a = left.getTagInfo();
+        const auto& b = right.getTagInfo();
+        return a.isSameVersion(b) ? right.isAfter(left) : a.isBefore(b);
     });
-    //    for (auto ri: list){
-    //        LC_ERR << ri.tagInfo.tagName;
-    //    }
 }
 
 const LC_ReleaseInfo& LC_ReleaseChecker::getLatestRelease() const {

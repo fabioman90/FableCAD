@@ -97,6 +97,7 @@ QG_DlgOptionsGeneral::QG_DlgOptionsGeneral(QWidget *parent)
             this, &QG_DlgOptionsGeneral::on_cbGridExtendAxisLinesToggled);
     connect(tbOtherSettings, &QToolButton::clicked,
             this, &QG_DlgOptionsGeneral::setOtherSettingsFolder);
+    groupBox_12->hide();
     connect(cbCheckNewVersion, stateChangedSignal,
             this, &QG_DlgOptionsGeneral::onCheckNewVersionChanged);
     connect(cbClassicStatusBar, stateChangedSignal,
@@ -749,7 +750,7 @@ void QG_DlgOptionsGeneral::init(){
     LC_GROUP_END();
 
     LC_GROUP("Startup"); {
-        cbSplash->setChecked(LC_GET_BOOL("ShowSplash", true));
+        cbSplash->setChecked(LC_GET_BOOL("ShowSplash", false));
         tab_mode_check_box->setChecked(LC_GET_BOOL("TabMode"));
         maximize_checkbox->setChecked(LC_GET_BOOL("Maximize"));
 
@@ -1357,13 +1358,13 @@ void QG_DlgOptionsGeneral::on_pb_clear_all_clicked(){
                                                               QMessageBox::Yes | QMessageBox::No);
     if (reply == QMessageBox::Yes) {
         RS_SETTINGS->clearAll();
-        QMessageBox::information(this, "info", tr("You must restart LibreCAD to see the changes."));
+        QMessageBox::information(this, "info", tr("Restart FableCAD to apply the changes."));
     }
 }
 
 void QG_DlgOptionsGeneral::on_pb_clear_geometry_clicked(){
     RS_SETTINGS->clearGeometry();
-    QMessageBox::information(this, "info", tr("You must restart LibreCAD to see the changes."));
+    QMessageBox::information(this, "info", tr("Restart FableCAD to apply the changes."));
 }
 
 void QG_DlgOptionsGeneral::setVariableFile(){

@@ -11,7 +11,11 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleGetInfoString</key>
-	<string>LibreCAD @FULL_VERSION@</string>
+	<string>FableCAD @FULL_VERSION@</string>
+	<key>CFBundleName</key>
+	<string>FableCAD</string>
+	<key>CFBundleDisplayName</key>
+	<string>FableCAD</string>
 	<key>CFBundleShortVersionString</key>
 	<string>@FULL_VERSION@</string>
 	<key>CFBundleVersion</key>
@@ -20,11 +24,8 @@
 	<string>@TYPEINFO@</string>
 	<key>CFBundleExecutable</key>
 	<string>@EXECUTABLE@</string>
-	<!-- Not a @TOKEN@: qmake derives the identifier from TARGET, which would
-	     give org.librecad.LibreCAD, while the CMake build sets it directly.
-	     Spelling it out here keeps both builds on one identifier. -->
 	<key>CFBundleIdentifier</key>
-	<string>org.librecad.librecad</string>
+	<string>io.github.fabioman90.fablecad</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -46,5 +47,6 @@
 			<string>Viewer</string>
 		</dict>
 	</array>
+	<!-- FABLECAD_SPARKLE_PROPERTIES -->
 </dict>
 </plist>

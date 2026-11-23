@@ -1239,7 +1239,8 @@ std::vector<std::uint8_t> emitR2007DimstyleObject(
     dwgBufferW strings;
     dwgBufferW handles;
     emitObjectPreamble(data, version, /*oType=*/0x45 /* DIMSTYLE */,
-                       source.handle, /*numReactors=*/0, /*xDictFlag=*/0);
+                       source.handle, static_cast<int>(source.reactorHandles.size()),
+                       source.extensionDictionaryFlag());
     if (!DrwObjectEncodeTestAccess::encodeDimstyle(
             source, version, &data, &strings, &handles))
         return {};
@@ -6884,6 +6885,8 @@ TEST_CASE("DRW_Dimstyle AC1021 framing preserves detached strings",
     DRW_Dimstyle source;
     source.handle = 0x490;
     source.name = "R2007-DIMSTYLE";
+    source.reactorHandles = {0x481, 0x482};
+    source.xDictHandle = 0x483;
     source.dimpost = "<>";
     source.dimapost = "alt <>";
     source.dimscale = 1.5;
@@ -6907,6 +6910,8 @@ TEST_CASE("DRW_Dimstyle AC1021 framing preserves detached strings",
     DRW_Dimstyle parsed;
     REQUIRE(DrwObjectEncodeTestAccess::parseDimstyle(
         parsed, DRW::AC1021, &reader));
+    CHECK(parsed.reactorHandles == source.reactorHandles);
+    CHECK(parsed.xDictHandle == source.xDictHandle);
     CHECK(parsed.name == source.name);
     CHECK(parsed.dimpost == source.dimpost);
     CHECK(parsed.dimapost == source.dimapost);

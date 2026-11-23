@@ -114,10 +114,7 @@
 #include "twostackedlabels.h"
 
 #ifndef QC_APP_ICON
-# define QC_APP_ICON ":/images/librecad.png"
-#endif
-#ifndef QC_ABOUT_ICON
-# define QC_ABOUT_ICON ":/images/intro_librecad.png"
+# define QC_APP_ICON ":/images/fablecad.svg"
 #endif
 
 /*	- Window Title Bar Extra (character) Size.
@@ -827,8 +824,7 @@ QDockWidget* QC_ApplicationWindow::currentTab(QDockWidget* dock) const {
 }
 
 void QC_ApplicationWindow::applyDefaultDockSizes() {
-    // About a fifth of the window for the right docks (their minimum widths may need more),
-    // and a short Command Line below them
+    // Keep the command history compact to leave more room for drawing.
     auto* command = findChild<QDockWidget*>("command_dockwidget");
     for (QDockWidget* dock : findChildren<QDockWidget*>()) {
         if (dock != command && !dock->isHidden() && !dock->isFloating()
@@ -838,7 +834,7 @@ void QC_ApplicationWindow::applyDefaultDockSizes() {
         }
     }
     if (command && !command->isHidden() && !command->isFloating() && tabifiedDockWidgets(command).isEmpty())
-        resizeDocks({command}, {140}, Qt::Vertical);
+        resizeDocks({command}, {dockWidgetArea(command) == Qt::BottomDockWidgetArea ? 84 : 140}, Qt::Vertical);
 }
 
 void QC_ApplicationWindow::checkForNewVersion() const {
@@ -1195,7 +1191,6 @@ void QC_ApplicationWindow::initSettings() {
         m_workspacesInvoker->init();
     }
     fireWorkspacesChanged();
-    m_styleHelper->loadFromSettings();
     LC_GROUP("Appearance");
     {
         QAction* viewLinesDraftAction = getAction("ViewLinesDraft");
@@ -1631,13 +1626,13 @@ void QC_ApplicationWindow::slotFileOpen() {
 
 void QC_ApplicationWindow::slotFileOpenLegacyLibreCadUtf8() {
     const QString explanation = tr(
-        "Use this only for known old LibreCAD R12–R2004 DXF files that contain "
+        "Use this only for known older R12–R2004 DXF files that contain "
         "UTF-8 text but declare the ANSI_1252 code page. This is not "
         "automatic encoding detection.\n\n"
         "The original opens in a separate document. Mixed encodings and raw "
         "metadata are not guaranteed to recover correctly. Review the result, "
         "then use Save As to save a corrected copy instead of replacing the original.");
-    if (QMessageBox::warning(this, tr("Legacy LibreCAD DXF recovery"), explanation,
+    if (QMessageBox::warning(this, tr("Legacy DXF recovery"), explanation,
                              QMessageBox::Ok | QMessageBox::Cancel,
                              QMessageBox::Cancel) != QMessageBox::Ok) {
         return;
@@ -1645,7 +1640,7 @@ void QC_ApplicationWindow::slotFileOpenLegacyLibreCadUtf8() {
 
     const QString directory = LC_GET_ONE_STR("Paths", "Open", RS_SYSTEM->getHomeDir());
     const QString fileName = QFileDialog::getOpenFileName(
-        this, tr("Open Legacy LibreCAD DXF (UTF-8)"), directory,
+        this, tr("Recover Legacy DXF (UTF-8)"), directory,
         tr("DXF drawings (*.dxf *.DXF)"));
     if (!fileName.isEmpty()) {
         openFile(fileName, RS2::FormatDXFRW, RS2::DxfTextEncoding::LegacyLibreCadUtf8);
@@ -1771,10 +1766,10 @@ void QC_ApplicationWindow::openFile(const QString& fileName, const RS2::FormatTy
                                   const RS2::DxfTextEncoding encoding) {
     const bool legacyUtf8 = encoding == RS2::DxfTextEncoding::LegacyLibreCadUtf8;
     if (legacyUtf8 && QFileInfo(fileName).suffix().compare(QLatin1String("dxf"), Qt::CaseInsensitive) != 0) {
-        const QString message = tr("Legacy LibreCAD UTF-8 recovery opens DXF files only. "
+        const QString message = tr("Legacy UTF-8 recovery opens DXF files only. "
                                    "Use ordinary Open for DWG and other formats.");
         m_commandWidget->appendHistory(message);
-        QMessageBox::information(this, tr("Legacy LibreCAD DXF recovery"), message);
+        QMessageBox::information(this, tr("Legacy DXF recovery"), message);
         return;
     }
     if (!QFileInfo::exists(fileName)) {
@@ -1844,7 +1839,7 @@ void QC_ApplicationWindow::openFile(const QString& fileName, const RS2::FormatTy
     QString message;
     int messageTimeout = 0;
     if (legacyUtf8) {
-      message = tr("Loaded with legacy LibreCAD UTF-8 recovery: %1. "
+      message = tr("Loaded with legacy UTF-8 recovery: %1. "
                    "Use Save As to save a corrected copy. Mixed encodings and raw "
                    "metadata are not guaranteed to recover correctly.").arg(fileName);
       if (blocksWithGeometry > 0) {

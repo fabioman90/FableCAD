@@ -28,7 +28,7 @@
 
 LC_WorkspaceListButton::LC_WorkspaceListButton(QC_ApplicationWindow *win):QToolButton(nullptr), m_appWin{win} {
     setPopupMode(MenuButtonPopup);
-    m_menu = new QMenu();
+    m_menu = new QMenu(this);
     connect(m_menu, &QMenu::aboutToShow, this, &LC_WorkspaceListButton::fillMenu);
     setMenu(m_menu);
     m_wcsIcon = QIcon(":/icons/workspace.lci");

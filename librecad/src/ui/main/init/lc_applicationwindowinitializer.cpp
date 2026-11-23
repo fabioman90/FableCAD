@@ -23,6 +23,7 @@
 
 #include <QMdiArea>
 #include <QMdiSubWindow>
+#include <QTimer>
 
 #include "lc_action_options_manager.h"
 #include "lc_actionfactory.h"
@@ -66,6 +67,7 @@ void LC_ApplicationWindowInitializer::initApplication(){
     m_appWin->m_gridViewInvoker = std::make_unique<LC_GridViewInvoker>(m_appWin);
     m_appWin->m_infoCursorSettingsManager = std::make_unique<LC_InfoCursorSettingsManager>(m_appWin);
     m_appWin->m_styleHelper = std::make_unique<LC_CustomStyleHelper>(m_appWin);
+    m_appWin->m_styleHelper->loadFromSettings();
     m_appWin->m_lastFilesOpener = std::make_unique<LC_LastOpenFilesOpener>(m_appWin);
 
     initActionGroupManager();
@@ -93,7 +95,7 @@ void LC_ApplicationWindowInitializer::initApplication(){
     initAutoSaveTimer();
     updateCommandsAlias();
     initPlugins();
-    m_appWin->showStatusMessage(qApp->applicationName() + " Ready", 2000);
+    m_appWin->showStatusMessage(qApp->applicationDisplayName() + " Ready", 2000);
     initReleaseChecker();
 }
 
@@ -103,9 +105,13 @@ void LC_ApplicationWindowInitializer::initSnapManager() const {
 }
 
 void LC_ApplicationWindowInitializer::initReleaseChecker(){
-    auto ownBuildVersion = XSTR(LC_VERSION);
+    auto ownBuildVersion = LCVersion();
     m_appWin->m_releaseChecker = std::make_unique<LC_ReleaseChecker>( ownBuildVersion,XSTR(LC_PRERELEASE));
     connect(m_appWin->m_releaseChecker.get(), &LC_ReleaseChecker::updatesAvailable, m_appWin, &QC_ApplicationWindow::onNewVersionAvailable);
+    QTimer::singleShot(0, m_appWin, [window = m_appWin] {
+        if (LC_GET_ONE_BOOL("Startup", "CheckForNewVersions", true))
+            window->checkForNewVersion();
+    });
 }
 
 void LC_ApplicationWindowInitializer::initActionGroupManager(){

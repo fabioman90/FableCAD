@@ -134,7 +134,7 @@ bool LC_DimStylesExporter::importStyles(QWidget* parent, QList<LC_DimStyle*>& st
         return false;
     }
     if (!doc.isObject() || doc.object().value(G_KEY_FILE_TYPE).toString() != G_DIMSTYLES_FILE_TYPE) {
-        QMessageBox::critical(parent, errorDialogCaption, tr("Unexpected format of file, it does not contains LibreCAD dimension styles."));
+        QMessageBox::critical(parent, errorDialogCaption, tr("Unexpected format of file, it does not contains FableCAD dimension styles."));
         return false;
     }
 
@@ -181,5 +181,5 @@ bool LC_DimStylesExporter::obtainFileName(QWidget* parent, QString& fileName, co
     const QString defaultFileName = forRead ? "LC_DimStyles" : baseFileName;
     return LC_FileNameSelectionService::doObtainFileName(parent, fileName, forRead, "lcds",
         defaultFileName, tr("Import Dimension Styles"),  tr("Export Dimension Styles"),
-        tr("LibreCAD dimension styles file (*.%1)"));
+        tr("FableCAD dimension styles file (*.%1)"));
 }

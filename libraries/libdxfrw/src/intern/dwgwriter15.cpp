@@ -1211,7 +1211,9 @@ bool dwgWriter15::emitBlockRecord(std::uint32_t handle,
         body.putBitShort(0);               // xrefindex BS (R2004-)
         body.putBit(0);                    // flags bit 4 (xref dep)
     }
-    body.putBit(0);                        // anon (*U bit)
+    body.putBit(!name.empty() && name[0] == '*' &&
+                handle != reservedHandle::BLOCK_MODEL_SPACE &&
+                handle != reservedHandle::BLOCK_PAPER_SPACE); // anonymous block
     body.putBit(0);                        // attdefs
     body.putBit(0);                        // xref
     body.putBit(0);                        // overlaid xref
@@ -4359,6 +4361,18 @@ void dwgWriter15::prepareBlockOwnedEntity(DRW_Entity& entity) {
             const auto block = m_userBlockHandles.find(toUpperCase(insert->name));
             if (block != m_userBlockHandles.end())
                 insert->blockRecH.ref = block->second;
+        }
+    }
+    if (auto* dimension = dynamic_cast<DRW_Dimension*>(&entity)) {
+        if (!dimension->dimStyleH.ref) {
+            const auto style = m_writingCtx.dimstyleMap.find(toUpperCase(dimension->getStyle()));
+            if (style != m_writingCtx.dimstyleMap.end())
+                dimension->dimStyleH.ref = style->second;
+        }
+        if (!dimension->blockH.ref) {
+            const auto block = m_userBlockHandles.find(toUpperCase(dimension->getName()));
+            if (block != m_userBlockHandles.end())
+                dimension->blockH.ref = block->second;
         }
     }
     if (entity.parentHandle == DRW::NoHandle) {

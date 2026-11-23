@@ -116,7 +116,7 @@ int runImageCommand(int argc, char* argv[], const ImageCommandSpec& spec) {
     QApplication app(normalizedArgc, normalizedArgv);
     QCoreApplication::setOrganizationName("LibreCAD");
     QCoreApplication::setApplicationName("LibreCAD");
-    QCoreApplication::setApplicationVersion(XSTR(LC_VERSION));
+    QCoreApplication::setApplicationVersion(LCVersion());
 
     QFileInfo prgInfo(QFile::decodeName(normalizedArgv[0]));
     const QString prgDir(prgInfo.absolutePath());

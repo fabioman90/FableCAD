@@ -43,18 +43,18 @@ namespace {
 
 bool LC_SettingsExporter::obtainSettingsFileName(QWidget* parent, QString& fileName, const bool forRead) {
     return LC_FileNameSelectionService::doObtainFileName(parent, fileName, forRead, "lcs", "lc_settings", tr("Import settings"),
-                                                         tr("Export Settings"), tr("LibreCAD settings file (*.%1)"));
+                                                         tr("Export Settings"), tr("FableCAD settings file (*.%1)"));
 }
 
 bool LC_SettingsExporter::obtainCustomWidgetsFileName(QWidget* parent, QString& fileName, const bool forRead, const bool forMenu) {
     if (forMenu) {
         return LC_FileNameSelectionService::doObtainFileName(parent, fileName, forRead, "lcm", "lc_custom_menus.lcm",
                                                              tr("Import custom menus"), tr("Export custom menus"),
-                                                             tr("LibreCAD custom menus file (*.%1)"));
+                                                             tr("FableCAD custom menus file (*.%1)"));
     }
     return LC_FileNameSelectionService::doObtainFileName(parent, fileName, forRead, "lct", "lc_custom_toolbars.lcm",
                                                          tr("Import custom toolbars"), tr("Export custom toolbars"),
-                                                         tr("LibreCAD custom toolbars file (*.%1)"));
+                                                         tr("FableCAD custom toolbars file (*.%1)"));
 }
 
 void LC_SettingsExporter::exportValue(const QString& key, const QVariant& settingValue, QJsonObject& objValues) {
@@ -142,7 +142,7 @@ bool LC_SettingsExporter::importSettings(QWidget* parent) {
     }
     if (!doc.isObject() || doc.object().value(G_KEY_FILE_TYPE).toString() != G_SETTINGS_FILE_TYPE) {
         QMessageBox::critical(parent, tr("Settings Import Error"),
-                              tr("Unexpected format of file, it does not contains LibreCAD preferences."));
+                              tr("Unexpected format of file, it does not contains FableCAD preferences."));
         return false;
     }
     const QJsonObject& groups = doc.object().value("groups").toObject();
@@ -200,7 +200,7 @@ void LC_SettingsExporter::importCustomWidgetSettings(QWidget* parent, bool forMe
     }
     if (!doc.isObject() || doc.object().value(G_KEY_FILE_TYPE).toString() != (forMenu? G_CUSTOM_MENUS_FILE_TYPE : G_CUSTOM_TOOLBARS_FILE_TYPE)) {
         QMessageBox::critical(parent, tr("Configurations Import Error"),
-                              tr("Unexpected format of file, it does not contains proper LibreCAD data."));
+                              tr("Unexpected format of file, it does not contains valid FableCAD data."));
         return;
     }
     const QJsonObject& groups = doc.object().value(forMenu ? "menus" : "toolbars").toObject();

@@ -8969,8 +8969,8 @@ Sei sicuro di voler scartare i cambiamenti?</translation>
     <name>LC_DlgAbout</name>
     <message>
         <location filename="../src/ui/dialogs/main/lc_dlgabout.ui" line="6"/>
-        <source>About LibreCAD</source>
-        <translation>Informazioni su LibreCAD</translation>
+        <source>About FableCAD</source>
+        <translation>Informazioni su FableCAD</translation>
     </message>
     <message>
         <location filename="../src/ui/dialogs/main/lc_dlgabout.ui" line="33"/>
@@ -12791,6 +12791,34 @@ Sei sicuro di voler scartare i cambiamenti?</translation>
         <location filename="../src/ui/main/persistence/lc_documentsstorage.cpp" line="446"/>
         <source>Skipped a backup that would replace the protected original legacy DXF.</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Save an editable DWG</source>
+        <translation>Salva un DWG modificabile</translation>
+    </message>
+    <message>
+        <source>Some DWG data cannot be preserved. You can save the editable drawing in a separate DWG 2018 file. Advanced objects such as table styles may be omitted.</source>
+        <translation>Puoi salvare il disegno modificabile in un nuovo file DWG 2018. Alcuni dati avanzati del file originale, come gli stili di tabella, potrebbero essere esclusi.</translation>
+    </message>
+    <message>
+        <source>Save DWG copy</source>
+        <translation>Salva copia DWG</translation>
+    </message>
+    <message>
+        <source>Choose a new file name to keep the existing drawing.</source>
+        <translation>Scegli un nome nuovo per conservare il disegno esistente.</translation>
+    </message>
+    <message>
+        <source>The DWG copy could not be written and reopened.</source>
+        <translation>Impossibile scrivere e riaprire la copia DWG.</translation>
+    </message>
+    <message>
+        <source>DWG 2018 (*.dwg)</source>
+        <translation>DWG 2018 (*.dwg)</translation>
+    </message>
+    <message>
+        <source>DWG save blocked</source>
+        <translation>Salvataggio DWG bloccato</translation>
     </message>
 </context>
 <context>
@@ -35502,12 +35530,12 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../src/ui/main/init/lc_toolbarfactory.cpp" line="330"/>
         <source>Circle</source>
-        <translation>Circolo</translation>
+        <translation>Cerchio</translation>
     </message>
     <message>
         <location filename="../src/ui/main/init/lc_toolbarfactory.cpp" line="331"/>
         <source>Arc</source>
-        <translation>Arc</translation>
+        <translation>Arco</translation>
     </message>
     <message>
         <location filename="../src/ui/main/init/lc_toolbarfactory.cpp" line="332"/>
@@ -35522,7 +35550,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../src/ui/main/init/lc_toolbarfactory.cpp" line="334"/>
         <source>Polyline</source>
-        <translation>Polimero</translation>
+        <translation>Polilinea</translation>
     </message>
     <message>
         <location filename="../src/ui/main/init/lc_toolbarfactory.cpp" line="335"/>
@@ -35621,6 +35649,110 @@ p, li { white-space: pre-wrap; }
         <location filename="../src/ui/main/init/lc_toolbarfactory.cpp" line="416"/>
         <source>Workspaces</source>
         <translation>Spazi di lavoro</translation>
+    </message>
+    <message>
+        <source>Drafting Tools</source>
+        <translation>Strumenti di disegno</translation>
+    </message>
+    <message>
+        <source>Draw</source>
+        <translation>Disegna</translation>
+    </message>
+    <message>
+        <source>Annotate</source>
+        <translation>Annotazioni</translation>
+    </message>
+    <message>
+        <source>Rectangle</source>
+        <translation>Rettangolo</translation>
+    </message>
+    <message>
+        <source>Hatch</source>
+        <translation>Retino</translation>
+    </message>
+    <message>
+        <source>Move / Copy</source>
+        <translation>Sposta / Copia</translation>
+    </message>
+    <message>
+        <source>Offset</source>
+        <translation>Offset</translation>
+    </message>
+    <message>
+        <source>Trim</source>
+        <translation>Taglia</translation>
+    </message>
+    <message>
+        <source>Rotate</source>
+        <translation>Ruota</translation>
+    </message>
+    <message>
+        <source>Mirror</source>
+        <translation>Specchia</translation>
+    </message>
+    <message>
+        <source>Scale</source>
+        <translation>Scala</translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation>Testo</translation>
+    </message>
+    <message>
+        <source>Linear</source>
+        <translation>Quota lineare</translation>
+    </message>
+    <message>
+        <source>Aligned</source>
+        <translation>Quota allineata</translation>
+    </message>
+    <message>
+        <source>Distance</source>
+        <translation>Distanza</translation>
+    </message>
+    <message>
+        <source>Fit drawing</source>
+        <translation>Adatta disegno</translation>
+    </message>
+    <message>
+        <source>Zoom area</source>
+        <translation>Zoom area</translation>
+    </message>
+    <message>
+        <source>Pan</source>
+        <translation>Sposta vista</translation>
+    </message>
+    <message>
+        <source>Grid</source>
+        <translation>Griglia</translation>
+    </message>
+    <message>
+        <source>Command line</source>
+        <translation>Riga di comando</translation>
+    </message>
+    <message>
+        <source>Workspace</source>
+        <translation>Area di lavoro</translation>
+    </message>
+    <message>
+        <source>Layers</source>
+        <translation>Layer</translation>
+    </message>
+    <message>
+        <source>Properties</source>
+        <translation>Proprietà</translation>
+    </message>
+    <message>
+        <source>Shortcuts</source>
+        <translation>Scorciatoie</translation>
+    </message>
+    <message>
+        <source>Save layout</source>
+        <translation>Salva layout</translation>
+    </message>
+    <message>
+        <source>Restore layout</source>
+        <translation>Ripristina layout</translation>
     </message>
 </context>
 <context>
@@ -37139,6 +37271,10 @@ The original opens in a separate document. Mixed encodings and raw metadata are 
         <source>Cmd</source>
         <translation>Cmd</translation>
     </message>
+    <message>
+        <source>Enter a command</source>
+        <translation>Inserisci un comando</translation>
+    </message>
 </context>
 <context>
     <name>QG_CoordinateWidget</name>
@@ -37409,8 +37545,8 @@ Ciò modifica ricorsivamente tutte le istanze del blocco stesso.</translation>
     </message>
     <message>
         <location filename="../src/ui/dialogs/main/qg_dlginitial.ui" line="85"/>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:large; font-weight:700;&quot;&gt;Welcome to LibreCAD&lt;/span&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Please choose the unit you want to use for new drawings and your preferred language for Ui and Command.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;You can change these settings later.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:large; font-weight:700;&quot;&gt;Benvenuto in LibreCAD&lt;/span&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Scegli l&apos;unità che vuoi usare per i nuovi disegni e la tua lingua preferita per l&apos;interfaccia e i comandi.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Puoi modificare queste impostazioni in seguito.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:large; font-weight:700;&quot;&gt;Welcome to FableCAD&lt;/span&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Please choose the unit you want to use for new drawings and your preferred language for Ui and Command.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;You can change these settings later.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:large; font-weight:700;&quot;&gt;Benvenuto in FableCAD&lt;/span&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Scegli l&apos;unità che vuoi usare per i nuovi disegni e la tua lingua preferita per l&apos;interfaccia e i comandi.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Puoi modificare queste impostazioni in seguito.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <location filename="../src/ui/dialogs/main/qg_dlginitial.ui" line="231"/>
@@ -39908,8 +40044,8 @@ Ciò modifica ricorsivamente tutte le istanze del blocco stesso.</translation>
     <message>
         <location filename="../src/ui/dialogs/settings/options_general/qg_dlgoptionsgeneral.cpp" line="1293"/>
         <location filename="../src/ui/dialogs/settings/options_general/qg_dlgoptionsgeneral.cpp" line="1299"/>
-        <source>You must restart LibreCAD to see the changes.</source>
-        <translation>È necessario riavviare LibreCAD per vedere i cambiamenti.</translation>
+        <source>Restart FableCAD to apply the changes.</source>
+        <translation>Riavvia FableCAD per applicare le modifiche.</translation>
     </message>
     <message>
         <location filename="../src/ui/dialogs/settings/options_general/qg_dlgoptionsgeneral.cpp" line="1315"/>
@@ -43278,6 +43414,10 @@ così il valore di passaggio predefinito richiesto per la cottura</translation>
 </context>
 <context>
     <name>QG_FileDialog</name>
+    <message>
+        <source>CAD Drawings (*.dwg *.dxf)</source>
+        <translation>Disegni CAD (*.dwg *.dxf)</translation>
+    </message>
     <message>
         <location filename="../src/ui/dialogs/file/qg_filedialog.cpp" line="135"/>
         <source>Drawing Exchange DXF 2000 %1</source>
@@ -50356,6 +50496,13 @@ Fine: (%8 , %9)</translation>
         <location filename="../src/ui/action_options/snap/qg_snapmiddleoptions.ui" line="81"/>
         <source>Number of equidistant division points</source>
         <translation>Numero di punti divisori equidistanti</translation>
+    </message>
+</context>
+<context>
+    <name>RS_FilterDXFRW</name>
+    <message>
+        <source>This DWG contains table data that FableCAD cannot preserve (%1). Save a DXF copy to keep working on the drawing.</source>
+        <translation>Questo DWG contiene dati di tabella che FableCAD non può conservare (%1). Salva una copia in DXF per continuare a lavorare sul disegno.</translation>
     </message>
 </context>
 </TS>

@@ -1474,6 +1474,7 @@ public:
   // createDimStyle consumer (which reads $DIM* keys) receives imported
   // values. Idempotent: never clobbers a key already present. (Phase 3A.0)
   void syncStructToVars();
+  void applyVariablesForDwg();
 
   void reset() {
     tType = DRW::DIMSTYLE;

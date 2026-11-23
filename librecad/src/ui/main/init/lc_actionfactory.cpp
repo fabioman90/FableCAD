@@ -680,7 +680,7 @@ void LC_ActionFactory::createFileActionsUncheckable(QMap<QString, QAction *> &ma
         {"FileNew",         &QC_ApplicationWindow::slotFileNewFromDefaultTemplate, tr("&New"),        ":/icons/new.lci",               "document-new"},
         {"FileNewTemplate", &QC_ApplicationWindow::slotFileNewFromTemplate, tr("New From &Template"), ":/icons/new_from_template.lci", "document-new"},// fixme - check
         {"FileOpen",        &QC_ApplicationWindow::slotFileOpen,        tr("&Open..."),           ":/icons/open.lci",              "document-open"},
-        {"FileOpenLegacyLibreCadUtf8", &QC_ApplicationWindow::slotFileOpenLegacyLibreCadUtf8, tr("Open Legacy LibreCAD DXF (UTF-8)..."), ":/icons/open.lci"},
+        {"FileOpenLegacyLibreCadUtf8", &QC_ApplicationWindow::slotFileOpenLegacyLibreCadUtf8, tr("Recover Legacy DXF (UTF-8)..."), ":/icons/open.lci"},
         {"FileSave",        &QC_ApplicationWindow::slotFileSave,        tr("&Save"),              ":/icons/save.lci",              "document-save"},
         {"FileSaveAs",      &QC_ApplicationWindow::slotFileSaveAs,      tr("Save &as..."),        ":/icons/save_as.lci",           "document-save-as"},
         {"FileSaveAll",     &QC_ApplicationWindow::slotFileSaveAll,     tr("Save A&ll..."),       ":/icons/save_all.lci"},
@@ -715,7 +715,7 @@ void LC_ActionFactory::createWidgetActionsUncheckable(QMap<QString, QAction *> &
 
 void LC_ActionFactory::createViewActionsUncheckable(QMap<QString, QAction *> &map, QActionGroup *group) {
     createMainWindowActions(map, group, {
-        {"FocusCommand", &QC_ApplicationWindow::slotFocusCommandLine,   tr("Focus on &Command Line"),   ":/icons/editclear.lci"},
+        {"FocusCommand", &QC_ApplicationWindow::slotFocusCommandLine,   tr("Focus on &Command Line"),   ":/icons/edit_clear.lci"},
         {"FocusOptions", &QC_ApplicationWindow::slotFocusOptionsWidget, tr("Focus on &Options Widget"), ":/icons/drawing_settings.lci"}
     });
 

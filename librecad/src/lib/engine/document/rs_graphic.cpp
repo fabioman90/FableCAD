@@ -516,6 +516,7 @@ void RS_Graphic::initForNewDocument() {
     RS_DEBUG->print("RS_Graphic::newDoc: before clear, autosaveFilename='%s'", m_autosaveFilename.toLatin1().data());
     m_dwgAdvancedMetadata.clear();
     m_dxfRecoverySourceFile.clear();
+    m_dwgWorkingCopy.clear();
     m_lineTypeList.clear();
     clear();
     clearLayers();

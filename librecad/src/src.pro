@@ -105,7 +105,7 @@ unix {
         # rather than a sed regex because qmake eats the backslashes.
         VERSION=$$system(echo "$${LC_VERSION}" | sed -e 's/^v//' | cut -d- -f1 | cut -d_ -f1 | cut -d. -f1-3)
         QMAKE_INFO_PLIST = Info.plist.app
-        ICON = ../res/images/librecad.icns
+        ICON = ../res/images/fablecad.icns
         contains(DISABLE_POSTSCRIPT, false) {
             QMAKE_POST_LINK = /bin/sh $$_PRO_FILE_PWD_/../../scripts/postprocess-osx.sh $$OUT_PWD/$${DESTDIR}/$${TARGET}.app/ $$[QT_INSTALL_BINS];
             # PlistBuddy's Set takes no type argument (only Add does), so a
@@ -115,7 +115,7 @@ unix {
     }
     else {
         TARGET = librecad
-        RC_FILE = ../res/images/librecad.icns
+        RC_FILE = ../res/images/fablecad.icns
         contains(DISABLE_POSTSCRIPT, false) {
             QMAKE_POST_LINK = cd $$_PRO_FILE_PWD_/../.. && scripts/postprocess-unix.sh $$[QT_INSTALL_BINS]
         }

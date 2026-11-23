@@ -111,7 +111,7 @@ void LC_DlgNewVersionAvailable::setup(const LC_ReleaseChecker *releaseChecker) {
         setWindowTitle(tr("Version Check"));
     }
 
-    ui->lblCurrentVersion->setText(XSTR(LC_VERSION));
+    ui->lblCurrentVersion->setText(LCVersion());
 }
 
 void LC_DlgNewVersionAvailable::onOk(){

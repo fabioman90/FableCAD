@@ -145,6 +145,7 @@ TEST_CASE("console helper maps every supported DWG output version",
     CHECK(LC_Console::dwgFormatForVersion("2010") == RS2::FormatDWG2010);
     CHECK(LC_Console::dwgFormatForVersion("r2013") == RS2::FormatDWG2013);
     CHECK(LC_Console::dwgFormatForVersion("2018") == RS2::FormatDWG2018);
+    CHECK(LC_Console::dwgFormatForVersion("R2020") == RS2::FormatDWG2018);
     CHECK(LC_Console::dwgFormatForVersion("2011") == RS2::FormatUnknown);
 }
 #endif

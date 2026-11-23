@@ -22,7 +22,9 @@
 #ifndef LC_CUSTOMSTYLEHELPER_H
 #define LC_CUSTOMSTYLEHELPER_H
 
+#include <QPalette>
 #include <QString>
+#include <optional>
 
 #include "lc_appwindowaware.h"
 
@@ -37,6 +39,7 @@ public:
     void reloadStyleSheet();
 private:
     QString m_styleSheetPath;
+    std::optional<QPalette> m_previousPalette;
 };
 
 #endif
