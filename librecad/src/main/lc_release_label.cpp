@@ -36,6 +36,14 @@ const char* LCVersion() {
 #endif
 }
 
+const char* LCApplicationDisplayName() {
+#ifdef FABLECAD_EDITION_YEAR
+    return "FableCAD " XSTR(FABLECAD_EDITION_YEAR);
+#else
+    return "FableCAD";
+#endif
+}
+
 QString LCReleaseLabel() {
     const QString version{LCVersion()};
     const std::map<QString, QString> labelMap = {

@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
     const auto versionStr = LCVersion();
 
     LC_Application app(argc, argv);
-    QGuiApplication::setApplicationDisplayName(QStringLiteral("FableCAD"));
+    QGuiApplication::setApplicationDisplayName(QString::fromLatin1(LCApplicationDisplayName()));
     app.setWindowIcon(QIcon(":/images/fablecad.svg"));
     QCoreApplication::setOrganizationName("LibreCAD");
     // Application name is "LibreCAD-<schemaMajor>" so each major release

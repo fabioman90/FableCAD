@@ -2392,6 +2392,10 @@ if(APPLE)
         NOT FABLECAD_SPARKLE_FEED_URL MATCHES "^https://[^/]+/([^/]+/)*${FABLECAD_EDITION_YEAR}/appcast[.]xml$"))
         message(FATAL_ERROR "An annual edition needs a four-digit year and a matching HTTPS /YEAR/appcast.xml")
     endif()
+    if(NOT FABLECAD_EDITION_YEAR STREQUAL "")
+        set_property(SOURCE librecad/src/main/lc_release_label.cpp APPEND PROPERTY
+            COMPILE_DEFINITIONS "FABLECAD_EDITION_YEAR=${FABLECAD_EDITION_YEAR}")
+    endif()
     if(FABLECAD_SPARKLE_FRAMEWORK OR FABLECAD_SPARKLE_FEED_URL OR FABLECAD_SPARKLE_PUBLIC_KEY)
         string(LENGTH "${FABLECAD_SPARKLE_PUBLIC_KEY}" key_length)
         if(NOT EXISTS "${FABLECAD_SPARKLE_FRAMEWORK}/Sparkle"
@@ -2444,6 +2448,11 @@ if(APPLE)
         file(READ "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" fablecad_plist)
         string(REPLACE "<!-- FABLECAD_SPARKLE_PROPERTIES -->" "${FABLECAD_SPARKLE_PLIST}"
             fablecad_plist "${fablecad_plist}")
+        if(NOT FABLECAD_EDITION_YEAR STREQUAL "")
+            string(REPLACE "<key>CFBundleDisplayName</key>\n\t<string>FableCAD</string>"
+                "<key>CFBundleDisplayName</key>\n\t<string>FableCAD ${FABLECAD_EDITION_YEAR}</string>"
+                fablecad_plist "${fablecad_plist}")
+        endif()
         file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" CONTENT "${fablecad_plist}" @ONLY)
     endif()
     unset(ICON)

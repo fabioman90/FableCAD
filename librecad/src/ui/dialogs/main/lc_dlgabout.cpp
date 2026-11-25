@@ -38,6 +38,7 @@ LC_DlgAbout::LC_DlgAbout(QWidget *parent)
     : LC_Dialog(parent, "About")
     , ui(std::make_unique<Ui::LC_DlgAbout>()){
     ui->setupUi(this);
+    setWindowTitle(tr("About %1").arg(QString::fromLatin1(LCApplicationDisplayName())));
 
     // Compiler macro list in Qt source tree
     // Src/qtbase/src/corelib/global/qcompilerdetection.h

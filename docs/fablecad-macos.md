@@ -26,7 +26,9 @@ An edition purchase is attached to the customer account. The customer can downlo
 the purchased edition again after moving to another Mac. The installed editor
 works offline and the next annual edition is an optional new purchase.
 
-Set `FABLECAD_EDITION_YEAR` for an annual macOS build. Supply a Sparkle feed
+Set `FABLECAD_EDITION_YEAR=2027` for the first commercial macOS edition. The year
+appears in the app display name and About window. The technical version remains
+available for identifying individual updates. Supply a Sparkle feed
 ending in `/YEAR/appcast.xml` and use a separate signing key for each edition.
 Publish only that year's updates and deltas in its signed feed. Annual builds
 check their edition's Sparkle feed exclusively. Leave the edition year empty
