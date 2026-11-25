@@ -33,18 +33,25 @@
 #include <QCloseEvent>
 #include <QApplication>
 #include <QGuiApplication>
+#include <QDateTime>
 #include <QDockWidget>
+#include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QLayout>
+#include <QLocale>
 #include <QMenuBar>
 #include <QMdiArea>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QProcess>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScopedValueRollback>
 #include <QScreen>
+#include <QSettings>
 #include <QShowEvent>
 #include <QSignalBlocker>
 #include <QStatusBar>
@@ -1009,6 +1016,12 @@ void QC_ApplicationWindow::doClose(QC_MDIWindow* w, const bool activateNext) {
         // support for cancelling of saving untitled new document (via close all and close event)
         return;
     }
+    if (parentWindow == nullptr && graphic != nullptr && !graphic->getAutoSaveFileName().isEmpty()) {
+        QSettings settings;
+        auto paths = settings.value(QStringLiteral("Recovery/Autosaves")).toStringList();
+        if (paths.removeAll(QFileInfo(graphic->getAutoSaveFileName()).absoluteFilePath()) > 0)
+            settings.setValue(QStringLiteral("Recovery/Autosaves"), paths);
+    }
     w->getGraphicView()->beginClose();
     w->close();
     m_windowList.removeOne(w);
@@ -1938,6 +1951,132 @@ void QC_ApplicationWindow::slotFileSaveAll() {
 /**
  * Autosave.
  */
+void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
+    const auto configuredHelper = qEnvironmentVariable("FABLECAD_DRAWING_TOOLS");
+    const auto bundledHelper = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(
+        QStringLiteral("../Helpers/fablecad-drawing-tools/fablecad-drawing-tools"));
+    const QFileInfo program(configuredHelper.isEmpty() ? bundledHelper : configuredHelper);
+    if (!program.isAbsolute() || !program.isFile() || !program.isExecutable()) {
+        QMessageBox::information(this, tr("Drawing Tools"),
+            tr("The optional drawing tools are unavailable. Configure FABLECAD_DRAWING_TOOLS "
+               "with the absolute path to the executable helper."));
+        return;
+    }
+
+    const bool pdf = tool == QStringLiteral("pdf");
+    const QString title = pdf ? tr("Import Vector PDF") :
+        tool == QStringLiteral("recover") ? tr("Recover DXF") : tr("Combine DXF Contours");
+    const auto source = QFileDialog::getOpenFileName(this, title,
+        LC_GET_ONE_STR("Paths", "Open", RS_SYSTEM->getHomeDir()),
+        pdf ? tr("PDF files (*.pdf)") : tr("DXF drawings (*.dxf)"));
+    if (source.isEmpty())
+        return;
+
+    QString operation = tool;
+    QStringList options;
+    bool accepted = false;
+    if (pdf) {
+        const int page = QInputDialog::getInt(this, title, tr("PDF page number"), 1, 1, 100000, 1, &accepted);
+        if (!accepted)
+            return;
+        const double scale = QInputDialog::getDouble(this, title, tr("Millimetres per PDF point"),
+            25.4 / 72.0, 0.000001, 100000.0, 6, &accepted);
+        if (!accepted)
+            return;
+        options << QStringLiteral("--page") << QString::number(page)
+                << QStringLiteral("--scale") << QString::number(scale, 'g', 12);
+    } else if (tool == QStringLiteral("contours")) {
+        const QStringList labels{tr("Union"), tr("Intersection"), tr("Difference (first minus second)")};
+        const auto label = QInputDialog::getItem(this, title, tr("Operation on the two closed polylines"),
+            labels, 0, false, &accepted);
+        if (!accepted)
+            return;
+        const QStringList commands{QStringLiteral("union"), QStringLiteral("intersection"), QStringLiteral("difference")};
+        operation = commands.at(labels.indexOf(label));
+    }
+
+    const QFileInfo input(source);
+    auto destination = QFileDialog::getSaveFileName(this, tr("Save Result as DXF"),
+       input.dir().filePath(input.completeBaseName() + QStringLiteral("-result.dxf")),
+       tr("DXF drawings (*.dxf)"), nullptr, QFileDialog::DontConfirmOverwrite);
+    if (destination.isEmpty())
+        return;
+    if (!destination.endsWith(QStringLiteral(".dxf"), Qt::CaseInsensitive))
+        destination += QStringLiteral(".dxf");
+
+    auto* process = new QProcess(this);
+    connect(process, &QProcess::errorOccurred, this, [this, process, title](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) {
+            QMessageBox::warning(this, title, process->errorString());
+            process->deleteLater();
+        }
+    });
+    connect(process, &QProcess::finished, this, [this, process, destination, title](int code, QProcess::ExitStatus status) {
+        const auto report = QString::fromUtf8(status == QProcess::NormalExit && code == 0
+            ? process->readAllStandardOutput() : process->readAllStandardError()).trimmed();
+        process->deleteLater();
+        if (status != QProcess::NormalExit || code != 0) {
+            QMessageBox::warning(this, title, report.isEmpty() ? tr("The drawing tool failed.") : report);
+            return;
+        }
+        openFile(destination, RS2::FormatDXFRW);
+        showStatusMessage(report, 8000);
+    });
+    process->start(program.absoluteFilePath(), QStringList{operation, source, destination} + options);
+}
+
+void QC_ApplicationWindow::showDrawingRecovery(bool automatic) {
+    QSettings settings;
+    const auto paths = settings.value(QStringLiteral("Recovery/Autosaves")).toStringList();
+    QStringList available;
+    QStringList entries;
+    for (const auto& path : paths) {
+        const QFileInfo file(path);
+        if (!file.isFile() || !file.isReadable() || file.isSymLink() || file.size() == 0)
+            continue;
+        available.append(path);
+        entries.append(tr("%1 — %2").arg(path, QLocale().toString(file.lastModified(), QLocale::ShortFormat)));
+    }
+    settings.setValue(QStringLiteral("Recovery/Autosaves"), available);
+    if (available.isEmpty()) {
+        if (!automatic)
+            QMessageBox::information(this, tr("Drawing Recovery"), tr("No autosaved drawings are available."));
+        return;
+    }
+
+    QInputDialog picker(this);
+    picker.setWindowTitle(tr("Drawing Recovery"));
+    picker.setLabelText(tr("Select an autosaved drawing to open as a separate copy."));
+    picker.setOption(QInputDialog::UseListViewForComboBoxItems);
+    picker.setComboBoxItems(entries);
+    picker.setOkButtonText(tr("Open Recovered Copy"));
+    if (picker.exec() != QDialog::Accepted)
+        return;
+
+    const auto selected = entries.indexOf(picker.textValue());
+    if (selected < 0)
+        return;
+    const QFileInfo source(available.at(selected));
+    const auto destination = QFileDialog::getSaveFileName(this, tr("Save Recovered Copy"),
+        source.absolutePath() + QStringLiteral("/recovered-") + source.completeBaseName() + QStringLiteral(".dxf"),
+        tr("DXF drawings (*.dxf)"), nullptr, QFileDialog::DontConfirmOverwrite);
+    if (destination.isEmpty())
+        return;
+
+    auto copy = destination;
+    if (!copy.endsWith(QStringLiteral(".dxf"), Qt::CaseInsensitive))
+        copy += QStringLiteral(".dxf");
+    if (!QFile::copy(source.absoluteFilePath(), copy)) {
+        QMessageBox::warning(this, tr("Drawing Recovery"),
+                             tr("Could not create the recovered copy. Choose an unused writable file name."));
+        return;
+    }
+
+    available.removeAll(source.absoluteFilePath());
+    settings.setValue(QStringLiteral("Recovery/Autosaves"), available);
+    openFile(copy, RS2::FormatDXFRW);
+}
+
 void QC_ApplicationWindow::autoSaveCurrentDrawing() {
     RS_DEBUG->print("QC_ApplicationWindow::autoSaveCurrentDrawing(): begin");
     if (!LC_GET_ONE_BOOL("Defaults", "AutoBackupDocument", true)) {
@@ -1954,6 +2093,17 @@ void QC_ApplicationWindow::autoSaveCurrentDrawing() {
         if (w->autoSaveDocument(autosaveFileName)) {
             RS_DEBUG->print("QC_ApplicationWindow::autoSaveCurrentDrawing(): auto-save succeeded, file='%s'",
                             autosaveFileName.toLatin1().data());
+            if (autosaveFileName.isEmpty())
+                return;
+            QSettings settings;
+            auto paths = settings.value(QStringLiteral("Recovery/Autosaves")).toStringList();
+            const auto path = QFileInfo(autosaveFileName).absoluteFilePath();
+            paths.removeAll(path);
+            paths.prepend(path);
+            while (paths.size() > 30)
+                paths.removeLast();
+            settings.setValue(QStringLiteral("Recovery/Autosaves"), paths);
+            settings.sync();
             showStatusMessage(tr("Auto-saved drawing"), 2000);
         }
         else {

@@ -33,3 +33,30 @@ ending in `/YEAR/appcast.xml` and use a separate signing key for each edition.
 Publish only that year's updates and deltas in its signed feed. Annual builds
 check their edition's Sparkle feed exclusively. Leave the edition year empty
 for builds that use the existing release channel.
+
+## Drawing tools
+
+**Options → Light Interface Theme** selects the light palette for the built-in
+interface. Drawing background colours and custom stylesheets are configured
+through the existing appearance settings.
+
+**File → Drawing Recovery** lists autosaves recorded by the editor. It opens
+a separate DXF copy at a new path. The same list is offered at startup when
+autosaves are available. DXF saves and autosaves are staged and reopened
+before replacing their destination.
+
+The optional **File → Drawing Tools** menu calls a local helper. macOS packages can place
+a standalone helper in `Contents/Helpers/fablecad-drawing-tools/`. For development, set
+`FABLECAD_DRAWING_TOOLS` to an absolute path to an executable that runs
+`scripts/fablecad-drawing-tools.py` with Python and the `ezdxf`,
+`pypdfium2`, and `pyclipr` packages available. If you use a virtual
+environment, the executable wrapper should invoke that environment's Python
+and forward all arguments. The helper works offline.
+
+- **Import Vector PDF** imports straight segments from a selected page with
+  a scale in millimetres per PDF point. Raster content, text, Bézier paths, and
+  nested form paths are outside this first importer.
+- **Recover DXF** uses ezdxf to repair an ASCII DXF and reports the audit fixes.
+- **Combine DXF Contours** takes a DXF containing exactly two closed,
+  straight-edged lightweight polylines. Difference subtracts the second
+  modelspace entity from the first. The result is a separate DXF.

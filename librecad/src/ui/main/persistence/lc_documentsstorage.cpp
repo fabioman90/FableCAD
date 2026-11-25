@@ -942,6 +942,36 @@ namespace {
     }
 #endif
 
+    bool writeVerifiedDxf(RS_Graphic& graphic, const QString& destination, RS2::FormatType format) {
+        const auto info = QFileInfo(destination);
+        QTemporaryFile staging(info.dir().filePath(QStringLiteral(".fablecad-XXXXXX.dxf")));
+        if (!staging.open())
+            return false;
+        const auto path = staging.fileName();
+        if (!staging.remove())
+            return false;
+        const auto cleanup = qScopeGuard([&] { QFile::remove(path); });
+
+        auto* io = RS_FileIO::instance();
+        RS_Graphic verification;
+        const auto refusePartialRead = [](bool, const QString&) { return false; };
+        if (!io->fileExport(graphic, path, format) ||
+            !io->fileImport(verification, path, RS2::FormatUnknown, refusePartialRead))
+            return false;
+
+        QFile input(path);
+        QSaveFile output(destination);
+        if (!input.open(QIODevice::ReadOnly) || !output.open(QIODevice::WriteOnly))
+            return false;
+        QByteArray buffer(64 * 1024, Qt::Uninitialized);
+        qint64 size;
+        while ((size = input.read(buffer.data(), buffer.size())) > 0) {
+            if (output.write(buffer.constData(), size) != size)
+                return false;
+        }
+        return size == 0 && output.commit();
+    }
+
     QString validatedFileAffix(const QString& affix, const QString& fallback) {
         for (const QChar character : affix) {
             if (character.unicode() < 0x20 || QStringLiteral("<>:\"/\\|?*").contains(character)) {
@@ -1275,6 +1305,11 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
     if (!actualName.isEmpty()) {
         graphic->prepareForSave();
         const auto* fileIO = RS_FileIO::instance();
+        const bool isDxf = actualName.endsWith(QLatin1String(".dxf"), Qt::CaseInsensitive);
+        const auto saveDrawing = [&] {
+            return isDxf ? writeVerifiedDxf(*graphic, actualName, actualType)
+                         : fileIO->fileExport(*graphic, actualName, actualType);
+        };
 #ifdef DWGSUPPORT
         const bool workingCopy = actualType == RS2::FormatDWG2018 &&
             graphic->dwgWorkingCopy() == QFileInfo(actualName).absoluteFilePath();
@@ -1286,7 +1321,7 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
             }
         } else {
             result = workingCopy ? writeDwgWorkingCopy(*graphic, actualName, true)
-                                 : fileIO->fileExport(*graphic, actualName, actualType);
+                                 : saveDrawing();
         }
         if (!experimental && !result && !workingCopy && actualType == RS2::FormatDWG2018 &&
             !fileIO->lastExportReport().isEmpty()) {
@@ -1325,7 +1360,7 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
             }
         }
 #else
-        result = fileIO->fileExport(*graphic, actualName, actualType);
+        result = saveDrawing();
 #endif
 #ifdef DWGSUPPORT
         if (!experimental && !result && actualName.endsWith(QLatin1String(".dwg"), Qt::CaseInsensitive)) {
@@ -1341,6 +1376,9 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
             }
         }
 #endif
+        if (isDxf && !result)
+            RS_DIALOGFACTORY->commandMessage(tr("The DXF could not be verified and saved. The destination was preserved."));
+
         // a drawing that failed to save still has changes to lose
         if (result) {
             const QFileInfo actualFileInfo(actualName);
@@ -1373,7 +1411,7 @@ bool LC_DocumentsStorage::autoSaveGraphic(RS_Graphic* graphic, QString& fileName
         RS_DEBUG->print("LC_DocumentsStorage::autoSaveGraphic: autosaveFileName='%s'", autosaveFileName.toLatin1().data());
         if (!autosaveFileName.isEmpty()) {
             RS_DEBUG->print("LC_DocumentsStorage::autoSaveGraphic: attempting export to '%s'", autosaveFileName.toLatin1().data());
-            ret = RS_FileIO::instance()->fileExport(*graphic, autosaveFileName, actualType);
+            ret = writeVerifiedDxf(*graphic, autosaveFileName, actualType);
             if (ret) {
                 hideBackupFile(autosaveFileName);
             }

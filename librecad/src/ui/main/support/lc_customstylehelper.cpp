@@ -62,22 +62,23 @@ bool LC_CustomStyleHelper::loadStyleSheet(const QString& path) {
             m_previousPalette = QApplication::palette();
         }
         QPalette palette = *m_previousPalette;
-        palette.setColor(QPalette::Window, QColor("#202e3a"));
-        palette.setColor(QPalette::Base, QColor("#17232e"));
-        palette.setColor(QPalette::AlternateBase, QColor("#263746"));
-        palette.setColor(QPalette::Button, QColor("#293b49"));
-        palette.setColor(QPalette::WindowText, QColor("#e1edf2"));
-        palette.setColor(QPalette::Text, QColor("#e1edf2"));
-        palette.setColor(QPalette::ButtonText, QColor("#e1edf2"));
-        palette.setColor(QPalette::PlaceholderText, QColor("#9fb4c1"));
-        palette.setColor(QPalette::Mid, QColor("#405665"));
-        palette.setColor(QPalette::Highlight, QColor("#30605e"));
-        palette.setColor(QPalette::HighlightedText, QColor("#f4fcfc"));
-        palette.setColor(QPalette::ToolTipBase, QColor("#293b49"));
-        palette.setColor(QPalette::ToolTipText, QColor("#e1edf2"));
-        palette.setColor(QPalette::Link, QColor("#6cd3c3"));
+        const bool light = LC_GET_ONE_BOOL("Widgets", "FableCADLightTheme", false);
+        palette.setColor(QPalette::Window, QColor(light ? "#edf2f5" : "#202e3a"));
+        palette.setColor(QPalette::Base, QColor(light ? "#ffffff" : "#17232e"));
+        palette.setColor(QPalette::AlternateBase, QColor(light ? "#e0e8ed" : "#263746"));
+        palette.setColor(QPalette::Button, QColor(light ? "#f6f9fa" : "#293b49"));
+        palette.setColor(QPalette::WindowText, QColor(light ? "#172d3a" : "#e1edf2"));
+        palette.setColor(QPalette::Text, QColor(light ? "#172d3a" : "#e1edf2"));
+        palette.setColor(QPalette::ButtonText, QColor(light ? "#172d3a" : "#e1edf2"));
+        palette.setColor(QPalette::PlaceholderText, QColor(light ? "#526b79" : "#9fb4c1"));
+        palette.setColor(QPalette::Mid, QColor(light ? "#a2b3be" : "#405665"));
+        palette.setColor(QPalette::Highlight, QColor(light ? "#327570" : "#30605e"));
+        palette.setColor(QPalette::HighlightedText, QColor(light ? "#ffffff" : "#f4fcfc"));
+        palette.setColor(QPalette::ToolTipBase, QColor(light ? "#f6f9fa" : "#293b49"));
+        palette.setColor(QPalette::ToolTipText, QColor(light ? "#172d3a" : "#e1edf2"));
+        palette.setColor(QPalette::Link, QColor(light ? "#197269" : "#6cd3c3"));
         for (const auto role : {QPalette::WindowText, QPalette::Text, QPalette::ButtonText}) {
-            palette.setColor(QPalette::Disabled, role, QColor("#93a4af"));
+            palette.setColor(QPalette::Disabled, role, QColor(light ? "#697e8b" : "#93a4af"));
         }
         QApplication::setPalette(palette);
         LC_IconColorsOptions icons;
@@ -106,9 +107,10 @@ bool LC_CustomStyleHelper::loadStyleSheet(const QString& path) {
             }
             QTabBar::tab:selected {
                 background: palette(button);
-                border-bottom-color: #6cd3c3;
+                border-bottom-color: palette(link);
             }
             QMenu::item:selected, QMenuBar::item:selected {
+                color: palette(highlighted-text);
                 background: palette(highlight);
             }
             QLineEdit, QAbstractSpinBox, QComboBox, QTreeView, QListView, QTableView {
@@ -121,7 +123,7 @@ bool LC_CustomStyleHelper::loadStyleSheet(const QString& path) {
                 padding: 2px 4px;
             }
             QLineEdit:focus, QComboBox:focus, QAbstractSpinBox:focus {
-                border-color: #6cd3c3;
+                border-color: palette(link);
             }
             QToolBar {
                 spacing: 3px;
@@ -134,12 +136,12 @@ bool LC_CustomStyleHelper::loadStyleSheet(const QString& path) {
             }
             QToolBar QToolButton:hover {
                 background: palette(alternate-base);
-                border-color: #6cd3c3;
+                border-color: palette(link);
             }
             QToolBar QToolButton:checked,
             QToolBar QToolButton:pressed {
                 background: palette(highlight);
-                border-color: #6cd3c3;
+                border-color: palette(link);
             }
             QDockWidget#command_dockwidget QLineEdit#leCommand {
                 padding: 4px 7px;
@@ -147,7 +149,7 @@ bool LC_CustomStyleHelper::loadStyleSheet(const QString& path) {
                 border-radius: 4px;
             }
             QDockWidget#command_dockwidget QLineEdit#leCommand:focus {
-                border-color: #6cd3c3;
+                border-color: palette(link);
             }
             QDockWidget::title {
                 background: palette(alternate-base);
@@ -156,7 +158,7 @@ bool LC_CustomStyleHelper::loadStyleSheet(const QString& path) {
             QToolBar#snap_toolbar QToolButton:checked {
                 color: palette(highlighted-text);
                 background: palette(highlight);
-                border-color: #6cd3c3;
+                border-color: palette(link);
                 border-bottom-width: 2px;
             }
             QWidget#LC_PropertySheetWidget QWidget#headerSelection,

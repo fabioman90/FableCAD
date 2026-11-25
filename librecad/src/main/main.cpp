@@ -594,6 +594,8 @@ int main(int argc, char** argv) {
         LC_SET_ONE("Startup", "FirstLoad", false);
     }
 
+    QTimer::singleShot(0, &appWin, [&appWin] { appWin.showDrawingRecovery(true); });
+
     return execApplication(app);
 #    endif
 }
