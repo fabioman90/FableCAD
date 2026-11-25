@@ -15,7 +15,7 @@ name: Text foundations
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - '.github/workflows/text-foundations.yml'
       - 'CMakeLists.txt'
@@ -28,7 +28,7 @@ on:
       - 'librecad/src/lib/filters/**'
       - 'librecad/support/fonts/opentype/**'
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - '.github/workflows/text-foundations.yml'
       - 'CMakeLists.txt'
