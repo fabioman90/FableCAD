@@ -46,7 +46,7 @@ autosaves are available. DXF saves and autosaves are staged and reopened
 before replacing their destination.
 
 The optional **File → Drawing Tools** menu calls a local helper. macOS packages can place
-a standalone helper in `Contents/Helpers/fablecad-drawing-tools/`. For development, set
+a standalone helper in `Contents/Helpers/fablecad-drawing-tools`. For development, set
 `FABLECAD_DRAWING_TOOLS` to an absolute path to an executable that runs
 `scripts/fablecad-drawing-tools.py` with Python and the `ezdxf`,
 `pypdfium2`, and `pyclipr` packages available. If you use a virtual

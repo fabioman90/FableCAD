@@ -1954,7 +1954,7 @@ void QC_ApplicationWindow::slotFileSaveAll() {
 void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
     const auto configuredHelper = qEnvironmentVariable("FABLECAD_DRAWING_TOOLS");
     const auto bundledHelper = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(
-        QStringLiteral("../Helpers/fablecad-drawing-tools/fablecad-drawing-tools"));
+        QStringLiteral("../Helpers/fablecad-drawing-tools"));
     const QFileInfo program(configuredHelper.isEmpty() ? bundledHelper : configuredHelper);
     if (!program.isAbsolute() || !program.isFile() || !program.isExecutable()) {
         QMessageBox::information(this, tr("Drawing Tools"),
@@ -2049,6 +2049,7 @@ void QC_ApplicationWindow::showDrawingRecovery(bool automatic) {
     picker.setLabelText(tr("Select an autosaved drawing to open as a separate copy."));
     picker.setOption(QInputDialog::UseListViewForComboBoxItems);
     picker.setComboBoxItems(entries);
+    picker.setTextValue(entries.constFirst());
     picker.setOkButtonText(tr("Open Recovered Copy"));
     if (picker.exec() != QDialog::Accepted)
         return;
