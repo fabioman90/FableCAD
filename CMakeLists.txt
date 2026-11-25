@@ -2385,7 +2385,13 @@ if(APPLE)
     set(FABLECAD_SPARKLE_FRAMEWORK "" CACHE PATH "Path to Sparkle.framework for macOS updates")
     set(FABLECAD_SPARKLE_FEED_URL "" CACHE STRING "HTTPS URL of the signed Sparkle appcast")
     set(FABLECAD_SPARKLE_PUBLIC_KEY "" CACHE STRING "Public Ed25519 key for Sparkle")
+    set(FABLECAD_EDITION_YEAR "" CACHE STRING "Year of the macOS commercial edition")
     set(FABLECAD_SPARKLE_PLIST "")
+    if(NOT FABLECAD_EDITION_YEAR STREQUAL "" AND
+       (NOT FABLECAD_EDITION_YEAR MATCHES "^20[0-9][0-9]$" OR
+        NOT FABLECAD_SPARKLE_FEED_URL MATCHES "^https://[^/]+/([^/]+/)*${FABLECAD_EDITION_YEAR}/appcast[.]xml$"))
+        message(FATAL_ERROR "An annual edition needs a four-digit year and a matching HTTPS /YEAR/appcast.xml")
+    endif()
     if(FABLECAD_SPARKLE_FRAMEWORK OR FABLECAD_SPARKLE_FEED_URL OR FABLECAD_SPARKLE_PUBLIC_KEY)
         string(LENGTH "${FABLECAD_SPARKLE_PUBLIC_KEY}" key_length)
         if(NOT EXISTS "${FABLECAD_SPARKLE_FRAMEWORK}/Sparkle"
@@ -2400,8 +2406,12 @@ if(APPLE)
         set(sparkle_source librecad/src/ui/main/release_check/lc_sparkleupdater.mm)
         target_sources(librecad_lib PRIVATE "${sparkle_source}")
         set_source_files_properties("${sparkle_source}" PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+        set(release_checker_definitions FABLECAD_SPARKLE)
+        if(NOT FABLECAD_EDITION_YEAR STREQUAL "")
+            list(APPEND release_checker_definitions FABLECAD_ANNUAL_EDITION)
+        endif()
         set_source_files_properties(librecad/src/ui/main/release_check/lc_releasechecker.cpp
-            PROPERTIES COMPILE_DEFINITIONS FABLECAD_SPARKLE)
+            PROPERTIES COMPILE_DEFINITIONS "${release_checker_definitions}")
         target_link_libraries(librecad_lib PRIVATE "${FABLECAD_SPARKLE_FRAMEWORK}" "${FABLECAD_FOUNDATION}")
         set_property(TARGET librecad APPEND PROPERTY BUILD_RPATH "@executable_path/../Frameworks")
         set_property(TARGET librecad APPEND PROPERTY INSTALL_RPATH "@executable_path/../Frameworks")
@@ -2420,6 +2430,10 @@ if(APPLE)
             "<key>SUEnableAutomaticChecks</key><false/>
 "
             "<key>SUAllowsAutomaticUpdates</key><false/>")
+        if(NOT FABLECAD_EDITION_YEAR STREQUAL "")
+            string(APPEND FABLECAD_SPARKLE_PLIST
+                "\n<key>FableCADEditionYear</key><string>${FABLECAD_EDITION_YEAR}</string>")
+        endif()
     endif()
 
     configure_file(

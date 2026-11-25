@@ -19,3 +19,15 @@ The release checker can notify users of newer GitHub releases at startup. Use **
 Set the optional CMake variables `FABLECAD_SPARKLE_FRAMEWORK`, `FABLECAD_SPARKLE_FEED_URL`, and `FABLECAD_SPARKLE_PUBLIC_KEY` to the framework path, HTTPS appcast URL, and public EdDSA key.
 
 A local HTTPS test with two Developer ID-signed builds verified the update alert, the 97,846-byte delta download, installation, and relaunch into 2.2.10. The full ZIP was 115,815,311 bytes. A separate local test rejected a modified patch. The [2.2.10 release](https://github.com/fabioman90/FableCAD/releases/tag/v2.2.10) is the first Apple Silicon release configured for Sparkle. Its Developer ID-signed DMG and app were notarized and stapled. Users of the distributed 2.2.9 installer need to install 2.2.10 manually. Later versions are offered through the [signed production appcast](https://github.com/fabioman90/FableCAD/releases/latest/download/appcast.xml). An updater-enabled 2.2.9 test copy verified the alert, installation, and relaunch into the public 2.2.10 build. The production Sparkle key is held in the macOS Keychain.
+
+### Annual editions
+
+An edition purchase is attached to the customer account. The customer can download
+the purchased edition again after moving to another Mac. The installed editor
+works offline and the next annual edition is an optional new purchase.
+
+Set `FABLECAD_EDITION_YEAR` for an annual macOS build. Supply a Sparkle feed
+ending in `/YEAR/appcast.xml` and use a separate signing key for each edition.
+Publish only that year's updates and deltas in its signed feed. Annual builds
+check their edition's Sparkle feed exclusively. Leave the edition year empty
+for builds that use the existing release channel.
