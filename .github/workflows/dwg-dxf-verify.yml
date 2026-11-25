@@ -25,7 +25,7 @@ name: DWG/DXF verification
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - '.github/workflows/dwg-dxf-verify.yml'
       - 'CMakeLists.txt'
@@ -77,7 +77,7 @@ on:
       - 'librecad/src/lib/engine/document/linetypes/**'
       - 'scripts/dwg-fast-check.sh'
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - '.github/workflows/dwg-dxf-verify.yml'
       - 'CMakeLists.txt'
