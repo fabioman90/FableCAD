@@ -1,9 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <rect x="18" y="18" width="220" height="220" rx="48" fill="#182431"/>
   <rect x="21" y="21" width="214" height="214" rx="45" fill="none" stroke="#345369" stroke-width="3"/>
-  <path d="M80 184V74h102M80 124h69" fill="none" stroke="#e3f1f3"
-        stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="149" cy="124" r="10" fill="#6cd3c3"/>
-  <path d="M177 155h25m-12.5-12.5v25" fill="none" stroke="#6cd3c3"
-        stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(15 12) scale(.88)">
+    <path d="M75 143V62h105M75 106h65" fill="none" stroke="#e3f1f3"
+          stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="140" cy="106" r="9" fill="#6cd3c3"/>
+  </g>
+  <path d="M168 127h24m-12-12v24" fill="none" stroke="#6cd3c3" stroke-width="3" stroke-linecap="round"/>
+  <rect x="50" y="164" width="156" height="53" rx="14" fill="#6cd3c3"/>
+  <g fill="#122b33">
+    <path d="M712 1155Q661 1216 566 1216Q436 1216 389 1119Q362 1063 357 941H80Q87 1126 147 1240Q261 1457 552 1457Q782 1457 918.0 1329.5Q1054 1202 1054 992Q1054 831 958 706Q895 623 751 521L637 440Q530 364 490.5 330.0Q451 296 424 251H1057V0H64Q68 156 131 285Q192 430 419 592Q616 733 674 794Q763 889 763 1002Q763 1094 712 1155Z" transform="translate(82.3955 204) scale(0.02001953 -0.02001953)"/>
+    <path d="M564 -36Q287 -36 175.5 158.0Q64 352 64 711Q64 1070 175.5 1265.0Q287 1460 564 1460Q841 1460 953 1265Q1064 1070 1064 711Q1064 352 952.5 158.0Q841 -36 564 -36ZM731 329Q770 461 770 711Q770 973 730.5 1099.0Q691 1225 564 1225Q437 1225 396.0 1099.0Q355 973 355 711Q355 461 396.0 328.5Q437 196 564 196Q691 196 731 329Z" transform="translate(105.1978 204) scale(0.02001953 -0.02001953)"/>
+    <path d="M712 1155Q661 1216 566 1216Q436 1216 389 1119Q362 1063 357 941H80Q87 1126 147 1240Q261 1457 552 1457Q782 1457 918.0 1329.5Q1054 1202 1054 992Q1054 831 958 706Q895 623 751 521L637 440Q530 364 490.5 330.0Q451 296 424 251H1057V0H64Q68 156 131 285Q192 430 419 592Q616 733 674 794Q763 889 763 1002Q763 1094 712 1155Z" transform="translate(128.0000 204) scale(0.02001953 -0.02001953)"/>
+    <path d="M902 984Q788 822 711 650Q650 515 601.0 320.0Q552 125 552 0H256Q269 390 512 811Q669 1072 775 1175H52L56 1431H1080V1208Q1016 1145 902 984Z" transform="translate(150.8022 204) scale(0.02001953 -0.02001953)"/>
+  </g>
 </svg>
