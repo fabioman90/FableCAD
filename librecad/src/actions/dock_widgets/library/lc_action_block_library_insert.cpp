@@ -49,7 +49,7 @@ struct LC_ActionBlockLibraryInsert::RS_LibraryInsertData {
 };
 
 struct LC_ActionBlockLibraryInsert::ActionData {
-    RS_Graphic* prev;
+    std::unique_ptr<RS_Graphic> prev;
     RS_LibraryInsertData data;
 };
 
@@ -87,9 +87,9 @@ void LC_ActionBlockLibraryInsert::init(const int status) {
 void LC_ActionBlockLibraryInsert::setFile(const QString& file) const {
     m_actionData->data.file = file;
     const LC_DocumentsStorage storage;
-    delete m_actionData->prev;
-    m_actionData->prev = new RS_Graphic();
-    if (!storage.loadDocument(m_actionData->prev, file, RS2::FormatUnknown)) {
+    m_actionData->prev = std::make_unique<RS_Graphic>();
+    if (!storage.loadDocument(m_actionData->prev.get(), file, RS2::FormatUnknown)) {
+        m_actionData->prev.reset();
         commandMessage(tr("Cannot open file '%1'").arg(file));
     }
 }
@@ -99,12 +99,12 @@ void LC_ActionBlockLibraryInsert::reset() const {
     data.insertionPoint = {};
     data.factor = 1.0;
     data.angle = 0.0;
-    delete m_actionData->prev;
+    m_actionData->prev.reset();
 }
 
 bool LC_ActionBlockLibraryInsert::doTriggerModifications(LC_DocumentModificationBatch& ctx) {
     auto insertData = m_actionData->data;
-    insertData.graphic = m_actionData->prev;
+    insertData.graphic = m_actionData->prev.get();
     insertData.angle = toWorldAngleFromUCSBasis(m_actionData->data.angle);
     RS_Graphic* insertGraphic = insertData.graphic;
     if (insertGraphic != nullptr) {
@@ -123,6 +123,8 @@ void LC_ActionBlockLibraryInsert::doTriggerCompletion(const bool success) {
 void LC_ActionBlockLibraryInsert::onMouseMoveEvent(const int status, const LC_MouseEvent* e) {
     switch (status) {
         case SetTargetPoint: {
+            if (!m_actionData->prev)
+                break;
             m_actionData->data.insertionPoint = e->snapPoint;
 
             const auto& data = m_actionData->data;
@@ -130,7 +132,7 @@ void LC_ActionBlockLibraryInsert::onMouseMoveEvent(const int status, const LC_Mo
             m_preview->addAllFrom(*m_actionData->prev, m_viewport);
             m_preview->move(data.insertionPoint);
             if (m_graphic != nullptr) {
-                const RS_Vector scaleFactor = LC_CopyUtils::getInterGraphicsScaleFactor(data.factor, m_actionData->prev, m_graphic);
+                const RS_Vector scaleFactor = LC_CopyUtils::getInterGraphicsScaleFactor(data.factor, m_actionData->prev.get(), m_graphic);
                 m_preview->scale(data.insertionPoint, scaleFactor);
             }
             m_preview->rotate(data.insertionPoint, toWorldAngleFromUCSBasis(data.angle));

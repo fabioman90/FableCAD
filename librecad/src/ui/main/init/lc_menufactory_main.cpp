@@ -262,6 +262,10 @@ void LC_MenuFactoryMain::createFileMenu(QMenuBar* menuBar, QList<QMenu*>& topMen
 
     m_menusHolder->m_menuFile = menuFile;
 
+    auto* recovery = menuFile->addAction(tr("Drawing Recovery…"));
+    connect(recovery, &QAction::triggered, m_appWin,
+            [window = m_appWin] { window->showDrawingRecovery(false); });
+
     m_menusHolder->m_menuRecentFiles = new QMenu(tr("Recent Files"), menuFile);
 
     menuFile->addMenu(m_menusHolder->m_menuRecentFiles);
@@ -278,6 +282,15 @@ void LC_MenuFactoryMain::createFileMenu(QMenuBar* menuBar, QList<QMenu*>& topMen
                 "DrawImage",
                 "BlocksImport"
             });
+
+    auto* drawingTools = menuFile->addMenu(tr("Drawing Tools"));
+    drawingTools->addAction(tr("DWG Diagnostics…"), m_appWin, &QC_ApplicationWindow::showDwgDiagnostics);
+    drawingTools->addAction(tr("Import Vector PDF…"), m_appWin,
+        [window = m_appWin] { window->runDrawingTool(QStringLiteral("pdf")); });
+    drawingTools->addAction(tr("Recover DXF…"), m_appWin,
+        [window = m_appWin] { window->runDrawingTool(QStringLiteral("recover")); });
+    drawingTools->addAction(tr("Combine DXF Contours…"), m_appWin,
+        [window = m_appWin] { window->runDrawingTool(QStringLiteral("contours")); });
 
     subMenu(menuFile, tr("Export"), "export", ":/icons/export.lci", {
                 "FileExportMakerCam",
@@ -309,6 +322,14 @@ void LC_MenuFactoryMain::createSettingsMenu(QMenuBar* menuBar, QList<QMenu*>& to
                               "",
                               "OptionsDrawing",
                           });
+
+    auto* lightTheme = m_menusHolder->m_menuSettings->addAction(tr("Light Interface Theme"));
+    lightTheme->setCheckable(true);
+    lightTheme->setChecked(LC_GET_ONE_BOOL("Widgets", "FableCADLightTheme", false));
+    connect(lightTheme, &QAction::toggled, m_appWin, [window = m_appWin](bool enabled) {
+        LC_SET_ONE("Widgets", "FableCADLightTheme", enabled);
+        window->reloadStyleSheet();
+    });
 
     topMenuMenus << m_menusHolder->m_menuSettings;
 }

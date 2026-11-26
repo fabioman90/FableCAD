@@ -34,6 +34,7 @@
 
 class QG_ActionHandler;
 class QListView;
+class QLineEdit;
 class QPushButton;
 class QStandardItemModel;
 class QStandardItem;
@@ -67,13 +68,13 @@ protected:
 private:
     QPushButton *m_bInsert=nullptr;
     QString getItemDir(const QStandardItem * item );
-    QString getItemPath(const QStandardItem * item );
-    QIcon getIcon( const QString & dir, const QString & dxfFile, const QString & dxfPath );
-    QString getPathToPixmap( const QString & dir, const QString & dxfFile, const QString & dxfPath );
+    QIcon getIcon(const QString& dxfPath);
+    QString getPathToPixmap(const QString& dxfPath);
     const QG_ActionHandler* m_actionHandler = nullptr;
     std::unique_ptr<QStandardItemModel> m_dirModel;
     std::unique_ptr<QStandardItemModel> m_iconModel;
     QTreeView *m_dirView = nullptr;
+    QLineEdit *m_search = nullptr;
     QListView *m_ivPreview = nullptr;
     QPushButton *m_bRefresh = nullptr;
     QPushButton *m_bRebuild = nullptr;

@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
     const auto versionStr = LCVersion();
 
     LC_Application app(argc, argv);
-    QGuiApplication::setApplicationDisplayName(QStringLiteral("FableCAD"));
+    QGuiApplication::setApplicationDisplayName(QString::fromLatin1(LCApplicationDisplayName()));
     app.setWindowIcon(QIcon(":/images/fablecad.svg"));
     QCoreApplication::setOrganizationName("LibreCAD");
     // Application name is "LibreCAD-<schemaMajor>" so each major release
@@ -593,6 +593,8 @@ int main(int argc, char** argv) {
     if (first_load) {
         LC_SET_ONE("Startup", "FirstLoad", false);
     }
+
+    QTimer::singleShot(0, &appWin, [&appWin] { appWin.showDrawingRecovery(true); });
 
     return execApplication(app);
 #    endif

@@ -38,6 +38,8 @@ class LC_DocumentsStorage: public QObject{
 public:
     LC_DocumentsStorage();
     bool saveDocument(RS_Document *document,RS_GraphicView * graphicView, bool &cancelled);
+    QString dwgDiagnostics(const RS_Graphic& graphic) const;
+    bool saveVerifiedDwgCopy(RS_Graphic& graphic, const QString& destination, QString& error) const;
     bool saveBlockAs(RS_Graphic* block, const QString& fileName);
     bool autoSaveDocument(RS_Document *document,RS_GraphicView * graphicView, QString& autosaveFileName);
     bool saveDocumentAs(const RS_Document *document,RS_GraphicView * graphicView, bool &cancelled);

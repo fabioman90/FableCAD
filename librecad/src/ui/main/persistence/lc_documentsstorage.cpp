@@ -45,6 +45,7 @@
 #endif
 
 #include "lc_filedialogservice.h"
+#include "lc_entitymetauiutils.h"
 #include "qg_filedialog.h"
 #include "rs_debug.h"
 #include "rs_dialogfactory.h"
@@ -98,7 +99,8 @@ namespace {
             if (!result.contains("entities"))
                 return false;
             source = QFileInfo(input).canonicalFilePath();
-            const auto code = result.value("source_version").toString();
+            sourceVersion = result.value("source_version").toString();
+            const auto& code = sourceVersion;
             if (code == "AC1015") {
                 originalType = RS2::FormatDWG;
                 originalRelease = "R2000";
@@ -217,7 +219,40 @@ namespace {
                                                        name, format, originalType, label);
         }
 
-        bool save(RS_Graphic& drawing, const QString& destination, bool keepOriginalFormat) {
+        QString diagnostics(const RS_Graphic& drawing) const {
+            std::map<RS2::EntityType, int> limited;
+            for (const auto* entity : drawing) {
+                if (entity && entity->isAlive() && entity->sourceHandle() &&
+                    !editableGeometry.count(entity->sourceHandle()))
+                    ++limited[entity->rtti()];
+            }
+            QStringList lines{QObject::tr("Source format: %1").arg(sourceVersion),
+                              QObject::tr("Output format: DWG 2018 (AC1032)")};
+            if (limited.empty()) {
+                lines.append(QObject::tr("No model-space entities with restricted DWG editing were identified."));
+            } else {
+                lines.append(QObject::tr("Model-space entities with restricted DWG editing:"));
+                for (const auto& [name, type] : LC_EntityMetaUIUtils::getEntityTypeNamesList()) {
+                    auto found = limited.find(type);
+                    if (found != limited.end()) {
+                        lines.append(QObject::tr("%1: %2").arg(name).arg(found->second));
+                        limited.erase(found);
+                    }
+                }
+                for (const auto& [type, count] : limited)
+                    lines.append(QObject::tr("Entity type %1: %2").arg(static_cast<int>(type)).arg(count));
+            }
+            lines.append(QObject::tr("The copy is reopened and checked before it is written to the destination."));
+            return lines.join(QLatin1Char('\n'));
+        }
+
+        bool save(RS_Graphic& drawing, const QString& destination, bool keepOriginalFormat,
+                  bool workingCopy = false) {
+            const bool previousRecommendation = recommendOriginal;
+            const auto restoreRecommendation = qScopeGuard([&] {
+                if (workingCopy)
+                    recommendOriginal = previousRecommendation;
+            });
             const QFileInfo target(destination);
             QJsonArray layerEdits;
             QHash<QString, QString> renamed;
@@ -298,6 +333,7 @@ namespace {
         QString error;
 
     private:
+        QString sourceVersion;
         QJsonObject call(const QJsonObject& request) {
             if (process.state() != QProcess::Running) {
                 error = QObject::tr("The experimental DWG process has stopped.");
@@ -942,6 +978,36 @@ namespace {
     }
 #endif
 
+    bool writeVerifiedDxf(RS_Graphic& graphic, const QString& destination, RS2::FormatType format) {
+        const auto info = QFileInfo(destination);
+        QTemporaryFile staging(info.dir().filePath(QStringLiteral(".fablecad-XXXXXX.dxf")));
+        if (!staging.open())
+            return false;
+        const auto path = staging.fileName();
+        if (!staging.remove())
+            return false;
+        const auto cleanup = qScopeGuard([&] { QFile::remove(path); });
+
+        auto* io = RS_FileIO::instance();
+        RS_Graphic verification;
+        const auto refusePartialRead = [](bool, const QString&) { return false; };
+        if (!io->fileExport(graphic, path, format) ||
+            !io->fileImport(verification, path, RS2::FormatUnknown, refusePartialRead))
+            return false;
+
+        QFile input(path);
+        QSaveFile output(destination);
+        if (!input.open(QIODevice::ReadOnly) || !output.open(QIODevice::WriteOnly))
+            return false;
+        QByteArray buffer(64 * 1024, Qt::Uninitialized);
+        qint64 size;
+        while ((size = input.read(buffer.data(), buffer.size())) > 0) {
+            if (output.write(buffer.constData(), size) != size)
+                return false;
+        }
+        return size == 0 && output.commit();
+    }
+
     QString validatedFileAffix(const QString& affix, const QString& fallback) {
         for (const QChar character : affix) {
             if (character.unicode() < 0x20 || QStringLiteral("<>:\"/\\|?*").contains(character)) {
@@ -1225,6 +1291,49 @@ bool LC_DocumentsStorage::loadGraphic(RS_Graphic* graphic, const QString &filena
     return ret;
 }
 
+QString LC_DocumentsStorage::dwgDiagnostics(const RS_Graphic& graphic) const {
+#ifdef DWGSUPPORT
+    if (const auto* session = AcadrustSession::get(graphic))
+        return session->diagnostics(graphic);
+#else
+    Q_UNUSED(graphic);
+#endif
+    return tr("Detailed editing diagnostics require the Acadrust DWG reader. "
+              "You can save an editable DWG 2018 copy for review. Advanced DWG objects may be omitted.");
+}
+
+bool LC_DocumentsStorage::saveVerifiedDwgCopy(RS_Graphic& graphic, const QString& destination,
+                                             QString& error) const {
+#ifdef DWGSUPPORT
+    if (QFileInfo::exists(destination)) {
+        error = tr("Choose a new file name for the DWG copy.");
+        return false;
+    }
+    if (auto* session = AcadrustSession::get(graphic)) {
+        QTemporaryDir staging(QFileInfo(destination).dir().filePath(".fablecad-copy-XXXXXX"));
+        if (!staging.isValid()) {
+            error = staging.errorString();
+            return false;
+        }
+        const auto candidate = staging.filePath("verified.dwg");
+        if (!session->save(graphic, candidate, false, true)) {
+            error = session->error;
+            return false;
+        }
+        if (QFile::rename(candidate, destination))
+            return true;
+    } else if (writeDwgWorkingCopy(graphic, destination, false)) {
+        return true;
+    }
+    error = tr("The verified DWG copy could not be saved.");
+#else
+    Q_UNUSED(graphic);
+    Q_UNUSED(destination);
+    error = tr("This build does not support saving DWG files.");
+#endif
+    return false;
+}
+
 bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
     bool result = false;
     const RS2::FormatType actualType = graphic->getFormatType();
@@ -1275,6 +1384,11 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
     if (!actualName.isEmpty()) {
         graphic->prepareForSave();
         const auto* fileIO = RS_FileIO::instance();
+        const bool isDxf = actualName.endsWith(QLatin1String(".dxf"), Qt::CaseInsensitive);
+        const auto saveDrawing = [&] {
+            return isDxf ? writeVerifiedDxf(*graphic, actualName, actualType)
+                         : fileIO->fileExport(*graphic, actualName, actualType);
+        };
 #ifdef DWGSUPPORT
         const bool workingCopy = actualType == RS2::FormatDWG2018 &&
             graphic->dwgWorkingCopy() == QFileInfo(actualName).absoluteFilePath();
@@ -1286,7 +1400,7 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
             }
         } else {
             result = workingCopy ? writeDwgWorkingCopy(*graphic, actualName, true)
-                                 : fileIO->fileExport(*graphic, actualName, actualType);
+                                 : saveDrawing();
         }
         if (!experimental && !result && !workingCopy && actualType == RS2::FormatDWG2018 &&
             !fileIO->lastExportReport().isEmpty()) {
@@ -1325,7 +1439,7 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
             }
         }
 #else
-        result = fileIO->fileExport(*graphic, actualName, actualType);
+        result = saveDrawing();
 #endif
 #ifdef DWGSUPPORT
         if (!experimental && !result && actualName.endsWith(QLatin1String(".dwg"), Qt::CaseInsensitive)) {
@@ -1341,6 +1455,9 @@ bool LC_DocumentsStorage::doSave(RS_Graphic* graphic, const bool sameFile) {
             }
         }
 #endif
+        if (isDxf && !result)
+            RS_DIALOGFACTORY->commandMessage(tr("The DXF could not be verified and saved. The destination was preserved."));
+
         // a drawing that failed to save still has changes to lose
         if (result) {
             const QFileInfo actualFileInfo(actualName);
@@ -1373,7 +1490,7 @@ bool LC_DocumentsStorage::autoSaveGraphic(RS_Graphic* graphic, QString& fileName
         RS_DEBUG->print("LC_DocumentsStorage::autoSaveGraphic: autosaveFileName='%s'", autosaveFileName.toLatin1().data());
         if (!autosaveFileName.isEmpty()) {
             RS_DEBUG->print("LC_DocumentsStorage::autoSaveGraphic: attempting export to '%s'", autosaveFileName.toLatin1().data());
-            ret = RS_FileIO::instance()->fileExport(*graphic, autosaveFileName, actualType);
+            ret = writeVerifiedDxf(*graphic, autosaveFileName, actualType);
             if (ret) {
                 hideBackupFile(autosaveFileName);
             }

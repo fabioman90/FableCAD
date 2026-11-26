@@ -44,6 +44,8 @@ QStringList handleArgs(int argc, char** argv, const QList<int>& argClean);
 
 const char* LCVersion();
 
+const char* LCApplicationDisplayName();
+
 /**
  * @brief LCReleaseLabel return a label for the current release based on LC_VERSION in src.pro
  * @return "Release Candidate" - if LC_VERSION contains rc;

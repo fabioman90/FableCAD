@@ -675,7 +675,7 @@ void LC_ActionFactory::createFileActionsUncheckable(QMap<QString, QAction *> &ma
     createMainWindowActions(map, group, {
         {"FileExport",      &QC_ApplicationWindow::slotFileExport,      tr("&Export as image"),   ":/icons/export.lci"},
         {"FileCloseAll",    &QC_ApplicationWindow::slotFileCloseAll,    tr("Close All"),          ":/icons/close_all.lci"},
-        {"FilePrintPDF",    &QC_ApplicationWindow::slotFilePrintPDF,    tr("Export as PDF"),      ":/icons/export_pdf.lci"},
+        {"FilePrintPDF",    &QC_ApplicationWindow::slotFilePrintPDF,    tr("Export Scaled PDF…"),      ":/icons/export_pdf.lci"},
         {"BlocksImport",    &QC_ApplicationWindow::slotImportBlock,     tr("&Block"),             ":/icons/insert_active_block.lci"},
         {"FileNew",         &QC_ApplicationWindow::slotFileNewFromDefaultTemplate, tr("&New"),        ":/icons/new.lci",               "document-new"},
         {"FileNewTemplate", &QC_ApplicationWindow::slotFileNewFromTemplate, tr("New From &Template"), ":/icons/new_from_template.lci", "document-new"},// fixme - check

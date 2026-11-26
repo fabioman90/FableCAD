@@ -149,6 +149,10 @@ void LC_ReleaseChecker::checkForNewVersion(const bool forceCheck) {
 #ifdef FABLECAD_SPARKLE
     if (LC_SparkleUpdater::check(forceCheck, LC_GET_ONE_BOOL("Startup", "CheckForNewVersions", true)))
         return;
+#ifdef FABLECAD_ANNUAL_EDITION
+    // The global release list also contains releases from other editions.
+    return;
+#endif
 #endif
     if (runsFromStorePackage()) {
         if (forceCheck)

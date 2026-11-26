@@ -29,6 +29,7 @@
 #include<cmath>
 
 #include "lc_guarded_signals_blocker.h"
+#include "qc_applicationwindow.h"
 #include "rs_actionprintpreview.h"
 #include "rs_debug.h"
 #include "ui_lc_print_preview_options_widget.h"
@@ -48,6 +49,19 @@ namespace {
  */
 LC_PrintPreviewOptionsWidget::LC_PrintPreviewOptionsWidget():ui(new Ui::LC_PrintPreviewOptionsWidget{}) {
     ui->setupUi(this);
+    auto* printArea = new QPushButton(tr("Center Area"), this);
+    printArea->setToolTip(tr("Select two corners to center the paper on a drawing area at the current scale."));
+    ui->horizontalLayout->insertWidget(ui->horizontalLayout->indexOf(ui->bCenter) + 1, printArea);
+    connect(printArea, &QPushButton::clicked, this, [this] {
+        if (m_action)
+            m_action->choosePrintArea();
+    });
+
+    auto* exportPdf = new QPushButton(tr("Export PDF…"), this);
+    ui->horizontalLayout->addWidget(exportPdf);
+    connect(exportPdf, &QPushButton::clicked, this, [] {
+        QC_ApplicationWindow::getAppWindow()->slotFilePrintPDF();
+    });
 
     // Connect ui actions
     connect(ui->cFixed, &QCheckBox::clicked, this, &LC_PrintPreviewOptionsWidget::onScaleFixedClicked);
