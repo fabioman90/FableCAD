@@ -289,6 +289,8 @@ void LC_MenuFactoryMain::createFileMenu(QMenuBar* menuBar, QList<QMenu*>& topMen
         [window = m_appWin] { window->runDrawingTool(QStringLiteral("pdf")); });
     drawingTools->addAction(tr("Recover DXF…"), m_appWin,
         [window = m_appWin] { window->runDrawingTool(QStringLiteral("recover")); });
+    drawingTools->addAction(tr("Import STEP View…"), m_appWin,
+        [window = m_appWin] { window->runDrawingTool(QStringLiteral("step")); });
     drawingTools->addAction(tr("Trace Raster Image…"), m_appWin,
         [window = m_appWin] { window->runDrawingTool(QStringLiteral("trace")); });
     drawingTools->addAction(tr("Nest Parts on Sheet…"), m_appWin,

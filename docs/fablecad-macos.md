@@ -101,3 +101,12 @@ Tracing follows the edges of dark regions, including both sides of thick
 strokes. Text and dimensions in an image are traced as outlines. Correct
 perspective or scan distortion before calibration. The standalone helper
 uses the optional `vtracer==0.6.15` and `fonttools` Python packages.
+
+
+**File → Drawing Tools → Import STEP View** projects a STEP model from the
+front, top, or right into a separate DXF in millimetres. Visible edges are
+on `STEP_VISIBLE`. Optionally include dashed occluded edges on `STEP_HIDDEN`.
+Straight edges and circular curves are editable DXF lines, arcs, or circles.
+Other projected curves are approximated as polylines with a 0.05 mm
+deflection setting. The optional helper uses Open CASCADE through the
+`cadquery-ocp-novtk==8.0.1.1.0` Python bindings.

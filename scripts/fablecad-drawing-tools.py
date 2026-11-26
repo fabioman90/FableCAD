@@ -237,6 +237,113 @@ def vectorize_image(source, reference_pixels, reference_mm):
     return drawing, f"Traced {len(model)} contours at {scale:.6g} mm per pixel."
 
 
+def step_view(source, view, hidden):
+    import ezdxf
+    from OCP.HLRAlgo import HLRAlgo_Projector
+    from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+    from OCP.IFSelect import IFSelect_RetDone
+    from OCP.STEPControl import STEPControl_Reader
+    from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+
+    reader = STEPControl_Reader()
+    if reader.ReadFile(str(source)) != IFSelect_RetDone:
+        raise ValueError("The STEP document could not be read.")
+    reader.SetSystemLengthUnit(1.0)
+    if not reader.TransferRoots():
+        raise ValueError("The STEP document contains no transferable shapes.")
+    shape = reader.OneShape()
+    if shape.IsNull():
+        raise ValueError("The STEP document contains no shapes.")
+
+    # X is right in the front/top views, Y is right in the right-side view.
+    normal, horizontal = {
+        "front": ((0, -1, 0), (1, 0, 0)),
+        "top": ((0, 0, 1), (1, 0, 0)),
+        "right": ((1, 0, 0), (0, 1, 0)),
+    }[view]
+    projection = HLRBRep_Algo()
+    projection.Add(shape)
+    projection.Projector(HLRAlgo_Projector(gp_Ax2(gp_Pnt(), gp_Dir(*normal), gp_Dir(*horizontal))))
+    projection.Update()
+    projection.Hide()
+    edges = HLRBRep_HLRToShape(projection)
+
+    drawing = ezdxf.new("R2018")
+    drawing.units = ezdxf.units.MM
+    drawing.layers.new("STEP_VISIBLE")
+    model = drawing.modelspace()
+    projected_edges = set()
+    for compound in (edges.VCompound(), edges.OutLineVCompound(), edges.Rg1LineVCompound()):
+        add_step_edges(model, compound, "STEP_VISIBLE", projected_edges)
+    visible_count = len(model)
+    if not visible_count:
+        raise ValueError("No visible edges could be projected from this direction.")
+    if hidden:
+        drawing.linetypes.new("STEP_DASHED", dxfattribs={"pattern": [6.0, 4.0, -2.0]})
+        drawing.layers.new("STEP_HIDDEN", dxfattribs={"linetype": "STEP_DASHED", "color": 8})
+        for compound in (edges.HCompound(), edges.OutLineHCompound(), edges.Rg1LineHCompound()):
+            add_step_edges(model, compound, "STEP_HIDDEN", projected_edges)
+    return drawing, (f"Generated the {view} view with {visible_count} visible and "
+                     f"{len(model) - visible_count} hidden edges.")
+
+
+def add_step_edges(model, compound, layer, seen):
+    from OCP.BRepAdaptor import BRepAdaptor_Curve
+    from OCP.BRepLib import BRepLib
+    from OCP.GCPnts import GCPnts_QuasiUniformDeflection
+    from OCP.GeomAbs import GeomAbs_Circle, GeomAbs_Line
+    from OCP.TopAbs import TopAbs_EDGE
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+
+    if compound.IsNull():
+        return
+    BRepLib.BuildCurves3d_s(compound)
+    explorer = TopExp_Explorer(compound, TopAbs_EDGE)
+    attributes = {"layer": layer}
+    while explorer.More():
+        edge = TopoDS.Edge(explorer.Current())
+        explorer.Next()
+        curve = BRepAdaptor_Curve(edge)
+        first, last = curve.FirstParameter(), curve.LastParameter()
+        start, end = curve.Value(first), curve.Value(last)
+        if curve.GetType() == GeomAbs_Line:
+            if start.Distance(end) <= 1e-8:
+                continue
+            points = ((start.X(), start.Y()), (end.X(), end.Y()))
+            key = ("line", tuple(sorted(tuple(round(value, 7) for value in point) for point in points)))
+            if key not in seen:
+                model.add_line(*points, dxfattribs=attributes)
+        elif curve.GetType() == GeomAbs_Circle:
+            circle = curve.Circle()
+            origin = circle.Location()
+            center = (origin.X(), origin.Y())
+            radius = circle.Radius()
+            if abs(last - first) >= math.tau - 1e-7:
+                key = ("circle", *(round(value, 7) for value in (*center, radius)))
+                if key not in seen:
+                    model.add_circle(center, radius, dxfattribs=attributes)
+            else:
+                start_angle = math.degrees(math.atan2(start.Y() - center[1], start.X() - center[0])) % 360
+                end_angle = math.degrees(math.atan2(end.Y() - center[1], end.X() - center[0])) % 360
+                if circle.Axis().Direction().Z() < 0:
+                    start_angle, end_angle = end_angle, start_angle
+                key = ("arc", *(round(value, 7) for value in (*center, radius, start_angle, end_angle)))
+                if key not in seen:
+                    model.add_arc(center, radius, start_angle, end_angle, dxfattribs=attributes)
+        else:
+            samples = GCPnts_QuasiUniformDeflection(curve, 0.05)
+            if not samples.IsDone() or samples.NbPoints() < 2:
+                raise ValueError("A projected curve could not be approximated.")
+            points = [(point.X(), point.Y()) for point in
+                      (samples.Value(i) for i in range(1, samples.NbPoints() + 1))]
+            rounded = tuple((round(x, 7), round(y, 7)) for x, y in points)
+            key = ("polyline", min(rounded, rounded[::-1]))
+            if key not in seen:
+                model.add_lwpolyline(points, dxfattribs=attributes)
+        seen.add(key)
+
+
 def split_free_rectangles(free_rectangles, placed):
     left, bottom, right, top = placed
     split = set()
@@ -327,7 +434,7 @@ def nest_sheet(source, sheet_width, sheet_height, gap, rotate):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("recover", "pdf", "union", "intersection", "difference", "nest", "trace"))
+    parser.add_argument("operation", choices=("recover", "pdf", "union", "intersection", "difference", "nest", "trace", "step"))
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("--page", type=int, default=1)
@@ -338,6 +445,8 @@ def main():
     parser.add_argument("--rotate", action="store_true")
     parser.add_argument("--reference-pixels", type=float)
     parser.add_argument("--reference-mm", type=float)
+    parser.add_argument("--view", choices=("front", "top", "right"), default="front")
+    parser.add_argument("--hidden", action="store_true")
     args = parser.parse_args()
     if args.operation == "trace" and (args.reference_pixels is None or args.reference_mm is None):
         parser.error("trace requires --reference-pixels and --reference-mm")
@@ -346,6 +455,8 @@ def main():
             drawing, message = recover_dxf(args.source)
         elif args.operation == "pdf":
             drawing, message = pdf_paths(args.source, args.page, args.scale)
+        elif args.operation == "step":
+            drawing, message = step_view(args.source, args.view, args.hidden)
         elif args.operation == "trace":
             drawing, message = vectorize_image(args.source, args.reference_pixels, args.reference_mm)
         elif args.operation == "nest":
