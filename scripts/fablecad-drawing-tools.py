@@ -178,6 +178,65 @@ def combine_contours(source, operation):
     return drawing, f"Created {len(result)} closed contours."
 
 
+def vectorize_image(source, reference_pixels, reference_mm):
+    import re
+    from xml.etree import ElementTree
+
+    import ezdxf
+    import vtracer
+    from fontTools.pens.recordingPen import RecordingPen
+    from fontTools.svgLib.path import parse_path
+
+    if source.suffix.lower() not in {".png", ".jpg", ".jpeg"}:
+        raise ValueError("Choose a PNG or JPEG image.")
+    if not all(math.isfinite(value) and value > 0 for value in (reference_pixels, reference_mm)):
+        raise ValueError("Both reference lengths must be positive finite numbers.")
+    scale = reference_mm / reference_pixels
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError("The reference lengths produce an invalid scale.")
+
+    with tempfile.TemporaryDirectory(prefix="fablecad-trace-") as staging:
+        svg = Path(staging) / "trace.svg"
+        vtracer.convert_image_to_svg_py(str(source), str(svg), colormode="binary", mode="polygon")
+        traced = ElementTree.parse(svg).getroot()
+
+    drawing = ezdxf.new("R2018")
+    drawing.units = ezdxf.units.MM
+    drawing.layers.new("RASTER_TRACE")
+    model = drawing.modelspace()
+    image_height = float(traced.attrib["height"])
+    paths = "{http://www.w3.org/2000/svg}path"
+    for path in traced.findall(paths):
+        dx = dy = 0.0
+        if transform := path.get("transform"):
+            offset = re.fullmatch(r"translate\(\s*([^,\s]+)[,\s]+([^,\s]+)\s*\)", transform)
+            if not offset:
+                raise ValueError("The vectorizer returned an unsupported path transform.")
+            dx, dy = map(float, offset.groups())
+
+        pen = RecordingPen()
+        parse_path(path.attrib["d"], pen)
+        points = []
+        for operation, operands in pen.value:
+            if operation in {"moveTo", "lineTo"}:
+                x, y = operands[0]
+                point = ((x + dx) * scale, (image_height - y - dy) * scale)
+                if not all(map(math.isfinite, point)):
+                    raise ValueError("The calibrated contour exceeds the numeric range.")
+                points.append(point)
+            elif operation == "closePath":
+                if points and points[-1] == points[0]:
+                    points.pop()
+                if len(points) >= 3:
+                    model.add_lwpolyline(points, close=True, dxfattribs={"layer": "RASTER_TRACE"})
+                points = []
+            else:
+                raise ValueError("The vectorizer returned an unsupported path segment.")
+    if not len(model):
+        raise ValueError("No dark contours were found in the image.")
+    return drawing, f"Traced {len(model)} contours at {scale:.6g} mm per pixel."
+
+
 def split_free_rectangles(free_rectangles, placed):
     left, bottom, right, top = placed
     split = set()
@@ -268,7 +327,7 @@ def nest_sheet(source, sheet_width, sheet_height, gap, rotate):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("recover", "pdf", "union", "intersection", "difference", "nest"))
+    parser.add_argument("operation", choices=("recover", "pdf", "union", "intersection", "difference", "nest", "trace"))
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("--page", type=int, default=1)
@@ -277,12 +336,18 @@ def main():
     parser.add_argument("--sheet-height", type=float, default=500)
     parser.add_argument("--gap", type=float, default=5)
     parser.add_argument("--rotate", action="store_true")
+    parser.add_argument("--reference-pixels", type=float)
+    parser.add_argument("--reference-mm", type=float)
     args = parser.parse_args()
+    if args.operation == "trace" and (args.reference_pixels is None or args.reference_mm is None):
+        parser.error("trace requires --reference-pixels and --reference-mm")
     try:
         if args.operation == "recover":
             drawing, message = recover_dxf(args.source)
         elif args.operation == "pdf":
             drawing, message = pdf_paths(args.source, args.page, args.scale)
+        elif args.operation == "trace":
+            drawing, message = vectorize_image(args.source, args.reference_pixels, args.reference_mm)
         elif args.operation == "nest":
             drawing, message = nest_sheet(args.source, args.sheet_width, args.sheet_height, args.gap, args.rotate)
         else:

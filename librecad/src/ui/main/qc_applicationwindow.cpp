@@ -2004,11 +2004,12 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
 
     const bool pdf = tool == QStringLiteral("pdf");
     const bool nesting = tool == QStringLiteral("nest");
+    const bool trace = tool == QStringLiteral("trace");
     const QString title = pdf ? tr("Import Vector PDF") : nesting ? tr("Nest Parts on Sheet") :
-        tool == QStringLiteral("recover") ? tr("Recover DXF") : tr("Combine DXF Contours");
+        trace ? tr("Trace Raster Image") : tool == QStringLiteral("recover") ? tr("Recover DXF") : tr("Combine DXF Contours");
     const auto source = QFileDialog::getOpenFileName(this, title,
         LC_GET_ONE_STR("Paths", "Open", RS_SYSTEM->getHomeDir()),
-        pdf ? tr("PDF files (*.pdf)") : tr("DXF drawings (*.dxf)"));
+        pdf ? tr("PDF files (*.pdf)") : trace ? tr("Images (*.png *.jpg *.jpeg)") : tr("DXF drawings (*.dxf)"));
     if (source.isEmpty())
         return;
 
@@ -2025,6 +2026,17 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
             return;
         options << QStringLiteral("--page") << QString::number(page)
                 << QStringLiteral("--scale") << QString::number(scale, 'g', 12);
+    } else if (trace) {
+        const double pixels = QInputDialog::getDouble(this, title, tr("Reference length in the image (pixels)"),
+            100, 0.0001, 1e9, 4, &accepted);
+        if (!accepted)
+            return;
+        const double millimetres = QInputDialog::getDouble(this, title, tr("Actual length of the same reference (mm)"),
+            100, 0.0001, 1e9, 4, &accepted);
+        if (!accepted)
+            return;
+        options << QStringLiteral("--reference-pixels") << QString::number(pixels, 'g', 14)
+                << QStringLiteral("--reference-mm") << QString::number(millimetres, 'g', 14);
     } else if (nesting) {
         QDialog settings(this);
         settings.setWindowTitle(title);
@@ -2065,7 +2077,8 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
     }
 
     const QFileInfo input(source);
-    const auto suffix = nesting ? QStringLiteral("-nested.dxf") : QStringLiteral("-result.dxf");
+    const auto suffix = nesting ? QStringLiteral("-nested.dxf")
+                    : trace ? QStringLiteral("-traced.dxf") : QStringLiteral("-result.dxf");
     auto destination = QFileDialog::getSaveFileName(this, tr("Save Result as DXF"),
        input.dir().filePath(input.completeBaseName() + suffix),
        tr("DXF drawings (*.dxf)"), nullptr, QFileDialog::DontConfirmOverwrite);
