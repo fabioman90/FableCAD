@@ -38,6 +38,7 @@
 #include <cmath>
 #include <QScopeGuard>
 #include <map>
+#include <QCoreApplication>
 #include <QDir>
 
 #ifdef Q_OS_WIN
@@ -1240,7 +1241,14 @@ bool LC_DocumentsStorage::loadGraphic(RS_Graphic* graphic, const QString &filena
 #ifdef DWGSUPPORT
     delete AcadrustSession::get(*graphic);
     std::unique_ptr<AcadrustSession> experimental;
-    const auto helper = qEnvironmentVariable("FABLECAD_ACADRUST_HELPER");
+    auto helper = qEnvironmentVariable("FABLECAD_ACADRUST_HELPER");
+#ifdef Q_OS_WIN
+    if (helper.isEmpty()) {
+        const QFileInfo bundled(QDir(QCoreApplication::applicationDirPath()).filePath("fablecad-acadrust.exe"));
+        if (bundled.isFile())
+            helper = bundled.absoluteFilePath();
+    }
+#endif
     const auto directory = QFileInfo(filename).absoluteDir();
     QTemporaryFile projection(directory.filePath(".fablecad-acadrust-XXXXXX.dwg"));
     QString projectionPath;

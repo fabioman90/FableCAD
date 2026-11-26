@@ -1993,7 +1993,11 @@ void QC_ApplicationWindow::showDwgDiagnostics() {
 void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
     const auto configuredHelper = qEnvironmentVariable("FABLECAD_DRAWING_TOOLS");
     const auto bundledHelper = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(
+#ifdef Q_OS_WIN
+        QStringLiteral("fablecad-drawing-tools.exe"));
+#else
         QStringLiteral("../Helpers/fablecad-drawing-tools"));
+#endif
     const QFileInfo program(configuredHelper.isEmpty() ? bundledHelper : configuredHelper);
     if (!program.isAbsolute() || !program.isFile() || !program.isExecutable()) {
         QMessageBox::information(this, tr("Drawing Tools"),
