@@ -2005,11 +2005,13 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
     const bool pdf = tool == QStringLiteral("pdf");
     const bool nesting = tool == QStringLiteral("nest");
     const bool trace = tool == QStringLiteral("trace");
+    const bool step = tool == QStringLiteral("step");
     const QString title = pdf ? tr("Import Vector PDF") : nesting ? tr("Nest Parts on Sheet") :
-        trace ? tr("Trace Raster Image") : tool == QStringLiteral("recover") ? tr("Recover DXF") : tr("Combine DXF Contours");
+        step ? tr("Import STEP View") : trace ? tr("Trace Raster Image") : tool == QStringLiteral("recover") ? tr("Recover DXF") : tr("Combine DXF Contours");
     const auto source = QFileDialog::getOpenFileName(this, title,
         LC_GET_ONE_STR("Paths", "Open", RS_SYSTEM->getHomeDir()),
-        pdf ? tr("PDF files (*.pdf)") : trace ? tr("Images (*.png *.jpg *.jpeg)") : tr("DXF drawings (*.dxf)"));
+        pdf ? tr("PDF files (*.pdf)") : trace ? tr("Images (*.png *.jpg *.jpeg)")
+            : step ? tr("STEP models (*.step *.stp)") : tr("DXF drawings (*.dxf)"));
     if (source.isEmpty())
         return;
 
@@ -2026,6 +2028,19 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
             return;
         options << QStringLiteral("--page") << QString::number(page)
                 << QStringLiteral("--scale") << QString::number(scale, 'g', 12);
+    } else if (step) {
+        const QStringList labels{tr("Front"), tr("Top"), tr("Right")};
+        const auto label = QInputDialog::getItem(this, title, tr("Projection"), labels, 0, false, &accepted);
+        if (!accepted)
+            return;
+        const QStringList views{QStringLiteral("front"), QStringLiteral("top"), QStringLiteral("right")};
+        options << QStringLiteral("--view") << views.at(labels.indexOf(label));
+        const auto hidden = QMessageBox::question(this, title, tr("Include hidden edges on a separate layer?"),
+            QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
+        if (hidden == QMessageBox::Cancel)
+            return;
+        if (hidden == QMessageBox::Yes)
+            options << QStringLiteral("--hidden");
     } else if (trace) {
         const double pixels = QInputDialog::getDouble(this, title, tr("Reference length in the image (pixels)"),
             100, 0.0001, 1e9, 4, &accepted);
