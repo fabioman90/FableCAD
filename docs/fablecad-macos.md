@@ -91,3 +91,13 @@ are outside this workflow. The result is a separate DXF with part outlines on
 `NEST_PARTS` and the sheet reference on `NEST_SHEET`. Use the parts layer
 for downstream cutting. If the placement fails, the tool leaves the source
 and destination untouched.
+
+
+**File → Drawing Tools → Trace Raster Image** uses [VTracer](https://github.com/visioncortex/vtracer)
+to convert dark contours in a PNG or JPEG into closed DXF polylines. Enter
+the pixel length of a known reference and the same length in millimetres.
+The new DXF uses millimetres and puts traced contours on `RASTER_TRACE`.
+Tracing follows the edges of dark regions, including both sides of thick
+strokes. Text and dimensions in an image are traced as outlines. Correct
+perspective or scan distortion before calibration. The standalone helper
+uses the optional `vtracer==0.6.15` and `fonttools` Python packages.
