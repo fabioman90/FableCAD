@@ -31,6 +31,11 @@
 #include "lc_documentsstorage.h"
 #include "rs_system.h"
 
+#include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QDoubleSpinBox>
+#include <QFormLayout>
 #include <QCloseEvent>
 #include <QApplication>
 #include <QGuiApplication>
@@ -1998,7 +2003,8 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
     }
 
     const bool pdf = tool == QStringLiteral("pdf");
-    const QString title = pdf ? tr("Import Vector PDF") :
+    const bool nesting = tool == QStringLiteral("nest");
+    const QString title = pdf ? tr("Import Vector PDF") : nesting ? tr("Nest Parts on Sheet") :
         tool == QStringLiteral("recover") ? tr("Recover DXF") : tr("Combine DXF Contours");
     const auto source = QFileDialog::getOpenFileName(this, title,
         LC_GET_ONE_STR("Paths", "Open", RS_SYSTEM->getHomeDir()),
@@ -2019,6 +2025,35 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
             return;
         options << QStringLiteral("--page") << QString::number(page)
                 << QStringLiteral("--scale") << QString::number(scale, 'g', 12);
+    } else if (nesting) {
+        QDialog settings(this);
+        settings.setWindowTitle(title);
+        auto* form = new QFormLayout(&settings);
+        const auto addDimension = [&](const QString& label, double minimum, double initial) {
+            auto* field = new QDoubleSpinBox(&settings);
+            field->setDecimals(4);
+            field->setRange(minimum, 1e9);
+            field->setValue(initial);
+            form->addRow(label, field);
+            return field;
+        };
+        const auto* width = addDimension(tr("Sheet width (drawing units)"), 0.0001, 1000);
+        const auto* height = addDimension(tr("Sheet height (drawing units)"), 0.0001, 500);
+        const auto* gap = addDimension(tr("Clearance between parts and edges"), 0, 5);
+        auto* rotation = new QCheckBox(tr("Allow 90° rotation"), &settings);
+        rotation->setChecked(true);
+        form->addRow(rotation);
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &settings);
+        form->addRow(buttons);
+        connect(buttons, &QDialogButtonBox::accepted, &settings, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &settings, &QDialog::reject);
+        if (settings.exec() != QDialog::Accepted)
+            return;
+        options << QStringLiteral("--sheet-width") << QString::number(width->value(), 'g', 14)
+                << QStringLiteral("--sheet-height") << QString::number(height->value(), 'g', 14)
+                << QStringLiteral("--gap") << QString::number(gap->value(), 'g', 14);
+        if (rotation->isChecked())
+            options << QStringLiteral("--rotate");
     } else if (tool == QStringLiteral("contours")) {
         const QStringList labels{tr("Union"), tr("Intersection"), tr("Difference (first minus second)")};
         const auto label = QInputDialog::getItem(this, title, tr("Operation on the two closed polylines"),
@@ -2030,8 +2065,9 @@ void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
     }
 
     const QFileInfo input(source);
+    const auto suffix = nesting ? QStringLiteral("-nested.dxf") : QStringLiteral("-result.dxf");
     auto destination = QFileDialog::getSaveFileName(this, tr("Save Result as DXF"),
-       input.dir().filePath(input.completeBaseName() + QStringLiteral("-result.dxf")),
+       input.dir().filePath(input.completeBaseName() + suffix),
        tr("DXF drawings (*.dxf)"), nullptr, QFileDialog::DontConfirmOverwrite);
     if (destination.isEmpty())
         return;
