@@ -2,6 +2,7 @@
 """Optional local PDF, DXF and Clipper2 tools for FableCAD."""
 import argparse
 import ctypes
+from contextlib import closing
 import math
 import os
 from pathlib import Path
@@ -28,6 +29,8 @@ def pdf_paths(source, page_number, scale):
     drawing.units = ezdxf.units.MM
     model = drawing.modelspace()
     skipped = 0
+    text_count = 0
+    skipped_text = 0
 
     with pdfium.PdfDocument(source) as document:
         if not 1 <= page_number <= len(document):
@@ -67,9 +70,51 @@ def pdf_paths(source, page_number, scale):
                     emit_pdf_path(model, start, segments, closed, raw)
                 continue
             skipped += 1
+        with closing(page.get_textpage()) as textpage:
+            for obj in page.get_objects(filter=[raw.FPDF_PAGEOBJ_TEXT], textpage=textpage):
+                if obj.container is not None:
+                    skipped_text += 1
+                    continue
+                try:
+                    imported = emit_pdf_text(model, obj, scale)
+                except (pdfium.PdfiumError, UnicodeError):
+                    imported = False
+                text_count += imported
+                skipped_text += not imported
     if not len(model):
-        raise ValueError("The PDF page contains no supported vector paths.")
-    return drawing, f"Imported {len(model)} entities. Skipped {skipped} unreadable or nested paths."
+        raise ValueError("The PDF page contains no supported vector paths or text.")
+    return drawing, (f"Imported {len(model)} entities, including {text_count} text objects. "
+                     f"Skipped {skipped} paths and {skipped_text} text objects.")
+
+
+def emit_pdf_text(model, obj, scale):
+    text = obj.extract()
+    if not text.strip() or any(ord(char) < 32 or char == "\ufffd" for char in text):
+        return False
+
+    matrix = obj.get_matrix()
+    x_scale = math.hypot(matrix.a, matrix.b)
+    y_scale = math.hypot(matrix.c, matrix.d)
+    if not all(math.isfinite(value) for value in (x_scale, y_scale, matrix.e, matrix.f)):
+        return False
+    if not x_scale or not y_scale or matrix.a * matrix.d - matrix.b * matrix.c <= 0:
+        return False
+    # DXF TEXT uses a single baseline and width factor. Skip sheared transforms.
+    if abs(matrix.a * matrix.c + matrix.b * matrix.d) > 1e-5 * x_scale * y_scale:
+        return False
+
+    # PDF font size describes the em square, while DXF text height describes caps.
+    # A fallback CAD style approximates glyph size when the PDF font is unavailable.
+    height = obj.get_font_size() * y_scale * scale * 0.7
+    if not math.isfinite(height) or height <= 0:
+        return False
+    model.add_text(text, dxfattribs={
+        "insert": (matrix.e * scale, matrix.f * scale),
+        "height": height,
+        "rotation": math.degrees(math.atan2(matrix.b, matrix.a)) % 360,
+        "width": x_scale / y_scale,
+    })
+    return True
 
 
 def emit_pdf_path(model, start, segments, closed, raw):

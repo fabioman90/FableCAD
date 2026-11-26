@@ -71,8 +71,10 @@ and forward all arguments. The helper works offline.
 
 - **Import Vector PDF** imports lines and cubic Bézier paths from a selected
   page at a scale in millimetres per PDF point. Bézier curves, including arcs
-  represented as curves in a PDF, become editable DXF splines. Raster
-  content, text, and nested form paths are skipped.
+  represented as curves in a PDF, become editable DXF splines. Selectable
+  text becomes editable DXF TEXT with its baseline position and rotation.
+  PDF fonts are approximated with the default CAD style. Raster content,
+  nested forms, and mirrored or sheared text are skipped.
 - **Recover DXF** uses ezdxf to repair an ASCII DXF and reports the audit fixes.
 - **Combine DXF Contours** takes a DXF containing exactly two closed,
   straight-edged lightweight polylines. Difference subtracts the second
