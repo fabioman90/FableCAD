@@ -1,0 +1,122 @@
+name: FableCAD Windows installer
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/fablecad-windows.yml'
+      - 'scripts/fablecad-windows.iss'
+      - 'scripts/fablecad-drawing-tools.py'
+      - 'libraries/acadrust_bridge/**'
+      - 'librecad/res/images/fablecad.*'
+      - 'CMakeLists.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  WindowsX64:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.9.3'
+          arch: win64_msvc2022_64
+          modules: qt5compat
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest 'https://archives.boost.io/release/1.87.0/source/boost_1_87_0.7z' -OutFile boost.7z
+          7z x -y boost.7z
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -m pip install ezdxf==1.4.5 pypdfium2==5.15.2 pyclipr==0.1.8 vtracer==0.6.15 cadquery-ocp-novtk==8.0.1.1.0 pyinstaller==6.22.3
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Build and deploy the editor
+        shell: pwsh
+        env:
+          CXXFLAGS: /MP
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake -S . -B generated -G 'Visual Studio 17 2022' -A x64 "-DBOOST_ROOT=$PWD/boost_1_87_0" -DBUILD_TESTS=OFF -DLIBRECAD_ENABLE_OPENTYPE=OFF -DFABLECAD_EDITION_YEAR=2027
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build generated --config Release --parallel 3
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --install generated --config Release --prefix "$PWD/staging"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          windeployqt --release --compiler-runtime staging/bin/FableCAD.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./scripts/copy-vc-runtime.ps1 -Architecture AMD64 -Destination staging/bin
+          if (!(Test-Path staging/bin/platforms/qwindows.dll) -or !(Test-Path staging/bin/iconengines/lc_svgiconengine.dll)) {
+            throw 'The Windows package is missing a required Qt plugin.'
+          }
+
+      - name: Build the DWG bridge
+        shell: bash
+        run: |
+          set -e
+          sh libraries/acadrust_bridge/build-experimental.sh windows-bridge
+          cp windows-bridge/release/fablecad-acadrust.exe staging/bin/
+
+      - name: Bundle the drawing tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m PyInstaller --noconfirm --onefile --name fablecad-drawing-tools --collect-all OCP --distpath staging/bin --workpath generated/pyinstaller --specpath generated scripts/fablecad-drawing-tools.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force staging/bin/licenses | Out-Null
+          Copy-Item licenses/gpl-2.0.txt staging/bin/licenses/
+          $packages = python -c "import sysconfig; print(sysconfig.get_path('purelib'))"
+          Copy-Item "$packages/vtracer-0.6.15.dist-info/licenses/LICENSE" staging/bin/licenses/VTracer.txt
+          $occt = 'https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/V8_0_1'
+          Invoke-WebRequest "$occt/LICENSE_LGPL_21.txt" -OutFile staging/bin/licenses/OCCT-LGPL.txt
+          Invoke-WebRequest "$occt/OCCT_LGPL_EXCEPTION.txt" -OutFile staging/bin/licenses/OCCT-Exception.txt
+          Invoke-WebRequest 'https://raw.githubusercontent.com/CadQuery/OCP/master/LICENSE' -OutFile staging/bin/licenses/OCP.txt
+
+      - name: Verify the packaged editor and helpers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          python -c "import ezdxf; d=ezdxf.new('R2018'); d.modelspace().add_lwpolyline([(0,0),(50,0),(50,30),(0,30)],close=True); d.saveas('generated/smoke.dxf')"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $app = "$PWD/staging/bin/FableCAD.exe"
+          $helper = "$PWD/staging/bin/fablecad-drawing-tools.exe"
+          $pdf = Start-Process $app -ArgumentList 'dxf2pdf -o generated/smoke.pdf generated/smoke.dxf' -Wait -PassThru
+          if ($pdf.ExitCode -or !(Test-Path generated/smoke.pdf)) { throw 'DXF-to-PDF smoke check failed.' }
+          & $helper nest generated/smoke.dxf generated/nested.dxf --sheet-width 100 --sheet-height 100
+          if ($LASTEXITCODE -or !(Test-Path generated/nested.dxf)) { throw 'Drawing tools smoke check failed.' }
+          $sample = "$PWD/generated/sample.dwg"
+          Invoke-WebRequest 'https://raw.githubusercontent.com/LibreDWG/libredwg/master/test/test-data/2018/Line.dwg' -OutFile $sample
+          $bridge = "$PWD/staging/bin/fablecad-acadrust.exe"
+          $requests = @(
+            (@{command='open';path=$sample} | ConvertTo-Json -Compress),
+            (@{command='save';path="$PWD/generated/bridge-copy.dwg"} | ConvertTo-Json -Compress)
+          )
+          $requests | & $bridge
+          if ($LASTEXITCODE -or !(Test-Path generated/bridge-copy.dwg)) { throw 'DWG bridge smoke check failed.' }
+          $data = [IO.File]::ReadAllBytes("$PWD/generated/bridge-copy.dwg")
+          if ([Text.Encoding]::ASCII.GetString($data, 0, 6) -ne 'AC1032') { throw 'Unexpected DWG format.' }
+
+      - name: Package the installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $compiler = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
+          if (!(Test-Path $compiler)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+          & $compiler "/DStagingDir=$PWD/staging/bin" "/O$PWD/dist" scripts/fablecad-windows.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FableCAD-2027-Windows-x64
+          path: dist/FableCAD-2027-2.2.10-Windows-x64.exe
+          if-no-files-found: error

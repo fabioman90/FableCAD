@@ -43,6 +43,14 @@ add_compile_definitions (LC_VERSION=2.2.2.6-alpha)
 # Share the application and bundle version without recompiling every translation unit.
 set_source_files_properties(librecad/src/main/lc_release_label.cpp PROPERTIES
     COMPILE_DEFINITIONS "FABLECAD_VERSION=${PROJECT_VERSION}")
+set(FABLECAD_EDITION_YEAR "" CACHE STRING "Commercial edition year")
+if(NOT FABLECAD_EDITION_YEAR STREQUAL "")
+    if(NOT FABLECAD_EDITION_YEAR MATCHES "^20[0-9][0-9]$")
+        message(FATAL_ERROR "FABLECAD_EDITION_YEAR must be a four-digit year")
+    endif()
+    set_property(SOURCE librecad/src/main/lc_release_label.cpp APPEND PROPERTY
+        COMPILE_DEFINITIONS "FABLECAD_EDITION_YEAR=${FABLECAD_EDITION_YEAR}")
+endif()
 add_compile_definitions (LC_PRERELEASE=true)
 add_compile_definitions (QT_USE_QSTRINGBUILDER)
 
@@ -2385,16 +2393,11 @@ if(APPLE)
     set(FABLECAD_SPARKLE_FRAMEWORK "" CACHE PATH "Path to Sparkle.framework for macOS updates")
     set(FABLECAD_SPARKLE_FEED_URL "" CACHE STRING "HTTPS URL of the signed Sparkle appcast")
     set(FABLECAD_SPARKLE_PUBLIC_KEY "" CACHE STRING "Public Ed25519 key for Sparkle")
-    set(FABLECAD_EDITION_YEAR "" CACHE STRING "Year of the macOS commercial edition")
     set(FABLECAD_SPARKLE_PLIST "")
     if(NOT FABLECAD_EDITION_YEAR STREQUAL "" AND
        (NOT FABLECAD_EDITION_YEAR MATCHES "^20[0-9][0-9]$" OR
         NOT FABLECAD_SPARKLE_FEED_URL MATCHES "^https://[^/]+/([^/]+/)*${FABLECAD_EDITION_YEAR}/appcast[.]xml$"))
         message(FATAL_ERROR "An annual edition needs a four-digit year and a matching HTTPS /YEAR/appcast.xml")
-    endif()
-    if(NOT FABLECAD_EDITION_YEAR STREQUAL "")
-        set_property(SOURCE librecad/src/main/lc_release_label.cpp APPEND PROPERTY
-            COMPILE_DEFINITIONS "FABLECAD_EDITION_YEAR=${FABLECAD_EDITION_YEAR}")
     endif()
     if(FABLECAD_SPARKLE_FRAMEWORK OR FABLECAD_SPARKLE_FEED_URL OR FABLECAD_SPARKLE_PUBLIC_KEY)
         string(LENGTH "${FABLECAD_SPARKLE_PUBLIC_KEY}" key_length)
@@ -2479,6 +2482,11 @@ endif()
 # attach to the console they are started from. LIBRECAD_WINDOWS_CONSOLE=ON keeps
 # the console window, which shows the debug output.
 if(WIN32)
+    if(FABLECAD_EDITION_YEAR STREQUAL "2027")
+        set_target_properties(librecad PROPERTIES OUTPUT_NAME FableCAD)
+        target_sources(librecad PRIVATE librecad/res/images/fablecad.rc)
+        target_include_directories(librecad PRIVATE librecad/res/images)
+    endif()
     option(LIBRECAD_WINDOWS_CONSOLE "Build the Windows program with a console window for debug output" OFF)
     if(NOT LIBRECAD_WINDOWS_CONSOLE)
         set_target_properties(librecad PROPERTIES WIN32_EXECUTABLE ON)
