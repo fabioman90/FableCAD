@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   WindowsX64:
-    runs-on: windows-2022
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
       - uses: jurplel/install-qt-action@v4
