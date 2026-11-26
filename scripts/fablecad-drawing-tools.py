@@ -178,19 +178,113 @@ def combine_contours(source, operation):
     return drawing, f"Created {len(result)} closed contours."
 
 
+def split_free_rectangles(free_rectangles, placed):
+    left, bottom, right, top = placed
+    split = set()
+    for x0, y0, x1, y1 in free_rectangles:
+        if right <= x0 or x1 <= left or top <= y0 or y1 <= bottom:
+            split.add((x0, y0, x1, y1))
+            continue
+        if x0 < left:
+            split.add((x0, y0, left, y1))
+        if right < x1:
+            split.add((right, y0, x1, y1))
+        if y0 < bottom:
+            split.add((x0, y0, x1, bottom))
+        if top < y1:
+            split.add((x0, top, x1, y1))
+    return sorted(rect for rect in split if not any(
+        other != rect and other[0] <= rect[0] and other[1] <= rect[1]
+        and other[2] >= rect[2] and other[3] >= rect[3] for other in split
+    ))
+
+
+def nest_sheet(source, sheet_width, sheet_height, gap, rotate):
+    import ezdxf
+
+    if not all(math.isfinite(value) for value in (sheet_width, sheet_height, gap)):
+        raise ValueError("Sheet dimensions and clearance must be finite.")
+    if gap < 0 or min(sheet_width, sheet_height) <= 2 * gap:
+        raise ValueError("The sheet must have positive space inside its edge clearance.")
+    original = ezdxf.readfile(source)
+    parts = []
+    for index, entity in enumerate(original.modelspace(), 1):
+        if (entity.dxftype() != "LWPOLYLINE" or not entity.closed
+                or entity.dxf.elevation != 0 or tuple(entity.dxf.extrusion) != (0, 0, 1)
+                or entity.dxf.const_width):
+            raise ValueError(f"Part {index} must be a closed, planar 2D lightweight polyline with zero width.")
+        points = list(entity.get_points("xyseb"))
+        if (len(points) < 3 or any(sw or ew or bulge or not math.isfinite(x) or not math.isfinite(y)
+                                  for x, y, sw, ew, bulge in points)):
+            raise ValueError(f"Part {index} must have at least three finite, straight-edged vertices and zero width.")
+        x0 = min(p[0] for p in points)
+        y0 = min(p[1] for p in points)
+        vertices = [(x - x0, y - y0) for x, y, *_ in points]
+        width = max(x for x, _ in vertices)
+        height = max(y for _, y in vertices)
+        area = abs(sum(x * next_y - y * next_x
+                       for (x, y), (next_x, next_y) in zip(vertices, vertices[1:] + vertices[:1]))) / 2
+        if not math.isfinite(area) or area == 0:
+            raise ValueError(f"Part {index} has no usable area.")
+        parts.append((index, width, height, area, vertices))
+    if not parts:
+        raise ValueError("The source DXF contains no parts.")
+
+    # Reserve clearance on the right/top of each bounding box. The outer
+    # rectangle leaves the same clearance between the profiles and the sheet.
+    free_rectangles = [(gap, gap, sheet_width, sheet_height)]
+    drawing = ezdxf.new("R2018")
+    drawing.units = original.units
+    drawing.layers.new("NEST_PARTS")
+    drawing.layers.new("NEST_SHEET", dxfattribs={"color": 8})
+    output = drawing.modelspace()
+    rotated_count = 0
+    for index, width, height, _, vertices in sorted(
+            parts, key=lambda part: (-max(part[1:3]), -min(part[1:3]), part[0])):
+        sizes = [(width + gap, height + gap, False)]
+        if rotate and width != height:
+            sizes.append((height + gap, width + gap, True))
+        candidates = []
+        for x0, y0, x1, y1 in free_rectangles:
+            for w, h, rotated in sizes:
+                dx, dy = x1 - x0 - w, y1 - y0 - h
+                if dx >= 0 and dy >= 0:
+                    candidates.append((min(dx, dy), max(dx, dy), y0, x0, rotated, w, h))
+        if not candidates:
+            raise ValueError(f"Part {index} could not be placed. Try a larger sheet, a smaller clearance, or rotation.")
+        _, _, y, x, rotated, w, h = min(candidates)
+        free_rectangles = split_free_rectangles(free_rectangles, (x, y, x + w, y + h))
+        if rotated:
+            vertices = [(height - vy, vx) for vx, vy in vertices]
+            rotated_count += 1
+        output.add_lwpolyline([(x + vx, y + vy) for vx, vy in vertices], close=True,
+                              dxfattribs={"layer": "NEST_PARTS"})
+    output.add_lwpolyline([(0, 0), (sheet_width, 0), (sheet_width, sheet_height), (0, sheet_height)],
+                          close=True, dxfattribs={"layer": "NEST_SHEET"})
+    utilization = sum(part[3] for part in parts) / sheet_width / sheet_height
+    return drawing, (f"Placed {len(parts)} parts ({rotated_count} rotated). "
+                     f"Profiles cover {utilization:.1%} of the sheet.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("recover", "pdf", "union", "intersection", "difference"))
+    parser.add_argument("operation", choices=("recover", "pdf", "union", "intersection", "difference", "nest"))
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("--page", type=int, default=1)
     parser.add_argument("--scale", type=float, default=25.4 / 72)
+    parser.add_argument("--sheet-width", type=float, default=1000)
+    parser.add_argument("--sheet-height", type=float, default=500)
+    parser.add_argument("--gap", type=float, default=5)
+    parser.add_argument("--rotate", action="store_true")
     args = parser.parse_args()
     try:
         if args.operation == "recover":
             drawing, message = recover_dxf(args.source)
         elif args.operation == "pdf":
             drawing, message = pdf_paths(args.source, args.page, args.scale)
+        elif args.operation == "nest":
+            drawing, message = nest_sheet(args.source, args.sheet_width, args.sheet_height, args.gap, args.rotate)
         else:
             drawing, message = combine_contours(args.source, args.operation)
         import ezdxf

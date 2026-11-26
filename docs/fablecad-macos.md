@@ -79,3 +79,15 @@ and forward all arguments. The helper works offline.
 - **Combine DXF Contours** takes a DXF containing exactly two closed,
   straight-edged lightweight polylines. Difference subtracts the second
   modelspace entity from the first. The result is a separate DXF.
+
+
+**File → Drawing Tools → Nest Parts on Sheet** places one closed straight-edged
+lightweight polyline per part on a single rectangular sheet. Enter the sheet
+dimensions and the part-to-part and edge clearance in drawing units. Enable
+90° rotation unless material direction must be preserved. Packing uses part
+bounding boxes, so it leaves clearance between the contours and does not
+interlock concave profiles. Internal cutouts, curves, and other entity types
+are outside this workflow. The result is a separate DXF with part outlines on
+`NEST_PARTS` and the sheet reference on `NEST_SHEET`. Use the parts layer
+for downstream cutting. If the placement fails, the tool leaves the source
+and destination untouched.
