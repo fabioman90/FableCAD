@@ -28,6 +28,7 @@
 **********************************************************************/
 
 #include "qc_applicationwindow.h"
+#include "lc_documentsstorage.h"
 #include "rs_system.h"
 
 #include <QCloseEvent>
@@ -1951,6 +1952,39 @@ void QC_ApplicationWindow::slotFileSaveAll() {
 /**
  * Autosave.
  */
+void QC_ApplicationWindow::showDwgDiagnostics() {
+    auto* window = getCurrentMDIWindow();
+    auto* graphic = window ? window->getGraphic() : nullptr;
+    const auto title = tr("DWG Diagnostics");
+    if (!graphic || !window->getFileName().endsWith(".dwg", Qt::CaseInsensitive)) {
+        QMessageBox::information(this, title, tr("Open a DWG drawing to inspect it."));
+        return;
+    }
+
+    const LC_DocumentsStorage storage;
+    QMessageBox dialog(QMessageBox::Information, title, tr("Review this drawing before saving a DWG copy."),
+                       QMessageBox::Close, this);
+    dialog.setTextFormat(Qt::PlainText);
+    dialog.setInformativeText(storage.dwgDiagnostics(*graphic));
+    const auto* save = dialog.addButton(tr("Save Verified Copy…"), QMessageBox::ActionRole);
+    dialog.exec();
+    if (dialog.clickedButton() != save)
+        return;
+
+    const QFileInfo original(graphic->getFilename());
+    auto destination = QFileDialog::getSaveFileName(this, tr("Save Verified DWG Copy"),
+        original.dir().filePath(original.completeBaseName() + " - reviewed.dwg"), tr("DWG 2018 (*.dwg)"));
+    if (destination.isEmpty())
+        return;
+    if (!destination.endsWith(".dwg", Qt::CaseInsensitive))
+        destination += ".dwg";
+    QString error;
+    if (storage.saveVerifiedDwgCopy(*graphic, destination, error))
+        showStatusMessage(tr("Verified DWG copy saved."), 5000);
+    else
+        QMessageBox::warning(this, title, error);
+}
+
 void QC_ApplicationWindow::runDrawingTool(const QString& tool) {
     const auto configuredHelper = qEnvironmentVariable("FABLECAD_DRAWING_TOOLS");
     const auto bundledHelper = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(

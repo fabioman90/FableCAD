@@ -54,6 +54,7 @@ public:
     QStringList getAvailableCommands() override;
 
     void center() const;
+    void choosePrintArea();
     void zoomToPage() const;
     void fit() const;
     bool setScale(double newScale, bool autoZoom = true) const;
@@ -89,7 +90,9 @@ protected:
     */
     enum Status {
         Neutral,
-        Moving
+        Moving,
+        PrintAreaFirstCorner,
+        PrintAreaSecondCorner
     };
     struct ActionData;
     std::unique_ptr<ActionData> m_actionData;

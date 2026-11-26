@@ -36,6 +36,22 @@ for builds that use the existing release channel.
 
 ## Drawing tools
 
+**File → Export → Export Scaled PDF** opens Print Preview. Use the paper settings
+and scale field, then use **Center Area** to place the page over a detail by
+picking opposite corners. The chosen corners position the paper at the active
+scale. The printable paper margins define the clipping boundary. Use **Export
+PDF** in the preview to save the vector output.
+
+**File → Drawing Tools → DWG Diagnostics** reports model-space entity types with
+editing restrictions when the drawing was opened with Acadrust. **Save
+Verified Copy** writes a separate DWG 2018 file and checks that it reopens.
+The active drawing remains associated with its original file.
+
+In **Library Browser**, search across installed and custom block folders by
+file name. The results show previews and identify their folders. Double-click a
+result to start placement, then set the scale and rotation with the existing
+insertion options.
+
 **Options → Light Interface Theme** selects the light palette for the built-in
 interface. Drawing background colours and custom stylesheets are configured
 through the existing appearance settings.
@@ -53,9 +69,10 @@ a standalone helper in `Contents/Helpers/fablecad-drawing-tools`. For developmen
 environment, the executable wrapper should invoke that environment's Python
 and forward all arguments. The helper works offline.
 
-- **Import Vector PDF** imports straight segments from a selected page with
-  a scale in millimetres per PDF point. Raster content, text, Bézier paths, and
-  nested form paths are outside this first importer.
+- **Import Vector PDF** imports lines and cubic Bézier paths from a selected
+  page at a scale in millimetres per PDF point. Bézier curves, including arcs
+  represented as curves in a PDF, become editable DXF splines. Raster
+  content, text, and nested form paths are skipped.
 - **Recover DXF** uses ezdxf to repair an ASCII DXF and reports the audit fixes.
 - **Combine DXF Contours** takes a DXF containing exactly two closed,
   straight-edged lightweight polylines. Difference subtracts the second

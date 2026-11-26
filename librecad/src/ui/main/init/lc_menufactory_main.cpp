@@ -284,6 +284,7 @@ void LC_MenuFactoryMain::createFileMenu(QMenuBar* menuBar, QList<QMenu*>& topMen
             });
 
     auto* drawingTools = menuFile->addMenu(tr("Drawing Tools"));
+    drawingTools->addAction(tr("DWG Diagnostics…"), m_appWin, &QC_ApplicationWindow::showDwgDiagnostics);
     drawingTools->addAction(tr("Import Vector PDF…"), m_appWin,
         [window = m_appWin] { window->runDrawingTool(QStringLiteral("pdf")); });
     drawingTools->addAction(tr("Recover DXF…"), m_appWin,

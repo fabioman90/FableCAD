@@ -39,40 +39,66 @@ def pdf_paths(source, page_number, scale):
                 continue
             matrix = obj.get_matrix()
             paths = []
-            points = []
-            unsupported = False
-            closed = False
-            segment_count = raw.FPDFPath_CountSegments(obj)
-            for index in range(segment_count):
+            segments = []
+            start = None
+            for index in range(raw.FPDFPath_CountSegments(obj)):
                 segment = raw.FPDFPath_GetPathSegment(obj, index)
                 kind = raw.FPDFPathSegment_GetType(segment)
-                if kind == raw.FPDF_SEGMENT_MOVETO and points:
-                    paths.append((points, closed))
-                    points = []
-                    closed = False
-                if kind not in (raw.FPDF_SEGMENT_MOVETO, raw.FPDF_SEGMENT_LINETO):
-                    unsupported = True
-                    break
                 x, y = ctypes.c_float(), ctypes.c_float()
                 if not raw.FPDFPathSegment_GetPoint(segment, x, y):
-                    unsupported = True
                     break
                 px, py = matrix.on_point(x.value, y.value)
-                points.append((px * scale, py * scale))
-                closed = bool(raw.FPDFPathSegment_GetClose(segment))
-            if unsupported:
-                skipped += 1
+                point = (px * scale, py * scale)
+                if kind == raw.FPDF_SEGMENT_MOVETO:
+                    if segments:
+                        paths.append((start, segments, False))
+                    start, segments = point, []
+                elif start is not None and kind in (raw.FPDF_SEGMENT_LINETO, raw.FPDF_SEGMENT_BEZIERTO):
+                    segments.append((kind, point))
+                else:
+                    break
+                if raw.FPDFPathSegment_GetClose(segment):
+                    paths.append((start, segments, True))
+                    segments = []
+            else:
+                if segments:
+                    paths.append((start, segments, False))
+                for start, segments, closed in paths:
+                    emit_pdf_path(model, start, segments, closed, raw)
                 continue
-            if points:
-                paths.append((points, closed))
-            for vertices, is_closed in paths:
-                if len(vertices) == 2 and not is_closed:
-                    model.add_line(*vertices)
-                elif len(vertices) >= 3:
-                    model.add_lwpolyline(vertices, close=is_closed)
+            skipped += 1
     if not len(model):
         raise ValueError("The PDF page contains no supported vector paths.")
-    return drawing, f"Imported {len(model)} entities. Skipped {skipped} curved or nested paths."
+    return drawing, f"Imported {len(model)} entities. Skipped {skipped} unreadable or nested paths."
+
+
+def emit_pdf_path(model, start, segments, closed, raw):
+    if all(kind == raw.FPDF_SEGMENT_LINETO for kind, _ in segments):
+        vertices = [start, *(point for _, point in segments)]
+        if len(vertices) == 2 and not closed:
+            model.add_line(*vertices)
+        elif len(vertices) >= 3:
+            model.add_lwpolyline(vertices, close=closed)
+        return
+
+    current = start
+    controls = []
+    for kind, point in segments:
+        if kind == raw.FPDF_SEGMENT_BEZIERTO:
+            controls.append(point)
+            if len(controls) == 3:
+                model.add_open_spline([current, *controls], degree=3)
+                current = point
+                controls.clear()
+        else:
+            if controls:
+                raise ValueError("Invalid cubic Bézier segment in the PDF path.")
+            model.add_line(current, point)
+            current = point
+    if controls:
+        raise ValueError("Incomplete cubic Bézier segment in the PDF path.")
+    if closed and current != start:
+        model.add_line(current, start)
 
 
 def combine_contours(source, operation):

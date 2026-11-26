@@ -193,6 +193,7 @@ public slots:
     /** auto-save document */
     void autoSaveCurrentDrawing();
     void showDrawingRecovery(bool automatic);
+    void showDwgDiagnostics();
     void runDrawingTool(const QString& tool);
     /** exports the document as bitmap */
     void slotFileExport();

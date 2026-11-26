@@ -171,6 +171,26 @@ void RS_ActionPrintPreview::mouseMoveEvent(QMouseEvent* e) {
 void RS_ActionPrintPreview::mousePressEvent(QMouseEvent* e) {
     if (e->button() == Qt::LeftButton) {
         switch (getStatus()) {
+            case PrintAreaFirstCorner:
+                m_actionData->v1 = toGraph(e);
+                setStatus(PrintAreaSecondCorner);
+                break;
+            case PrintAreaSecondCorner: {
+                const auto second = toGraph(e);
+                const auto first = m_actionData->v1;
+                const auto* settings = m_graphic->getPlotSettings();
+                const auto area = settings->getPrintAreaSize(m_graphic->getUnit() != RS2::None);
+                const auto scale = settings->getPaperScale();
+                const RS_Vector margin{settings->getMarginLeftInUnits(), settings->getMarginBottomInUnits()};
+                m_graphic->setPaperInsertionBase(margin + (area - (first + second) * scale) * 0.5);
+                if (std::abs(first.x - second.x) * scale > area.x ||
+                    std::abs(first.y - second.y) * scale > area.y)
+                    printWarning(tr("The selected area exceeds one page at the current scale."));
+                setStatus(Neutral);
+                m_viewport->zoomPage();
+                m_graphicView->redraw(RS2::RedrawGrid);
+                break;
+            }
             case Neutral: {
                 m_actionData->v1 = toGraph(e);
                 setStatus(Moving);
@@ -183,6 +203,11 @@ void RS_ActionPrintPreview::mousePressEvent(QMouseEvent* e) {
 }
 
 void RS_ActionPrintPreview::mouseReleaseEvent(QMouseEvent* e) {
+    if (e->button() == Qt::RightButton &&
+        (getStatus() == PrintAreaFirstCorner || getStatus() == PrintAreaSecondCorner)) {
+        setStatus(Neutral);
+        return;
+    }
     switch (getStatus()) {
         case Moving:
             setStatus(Neutral);
@@ -294,9 +319,17 @@ RS2::CursorType RS_ActionPrintPreview::doGetMouseCursor([[maybe_unused]] const i
     switch (status) {
         case Moving:
             return RS2::ClosedHandCursor;
+        case PrintAreaFirstCorner:
+        case PrintAreaSecondCorner:
+            return RS2::CrossCursor;
         default:
             return RS2::OpenHandCursor;
     }
+}
+
+void RS_ActionPrintPreview::choosePrintArea() {
+    if (m_graphic)
+        setStatus(PrintAreaFirstCorner);
 }
 
 void RS_ActionPrintPreview::center() const {
@@ -509,6 +542,12 @@ int RS_ActionPrintPreview::getPagesNumVertical() const {
 }
 
 void RS_ActionPrintPreview::updateActionPrompt() {
+    if (getStatus() == PrintAreaFirstCorner || getStatus() == PrintAreaSecondCorner) {
+        updatePrompt(getStatus() == PrintAreaFirstCorner ? tr("Select the first corner of the print area")
+                                                       : tr("Select the opposite corner of the print area"),
+                     tr("Cancel"));
+        return;
+    }
     updatePrompt(tr("Drag with Left Button to Position Paper or with Middle Button to Pan"), "",
                  MOD_SHIFT_AND_CTRL(tr("Move Horizontally"), tr("Move Vertically")));
 }
