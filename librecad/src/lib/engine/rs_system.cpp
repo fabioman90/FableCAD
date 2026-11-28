@@ -31,6 +31,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QLocale>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTranslator>
@@ -101,6 +102,7 @@ void RS_System::initLanguageList() {
     RS_DEBUG->print("RS_System::initLanguageList");
     m_languageList.clear();
     QStringList lst = getFileList("qm", "qm");
+    lst += QDir(QStringLiteral(":/i18n")).entryList({QStringLiteral("librecad_*.qm")}, QDir::Files);
 
     LC_GROUP("Paths"); // fixme settings
     lst += (LC_GET_STR("Translations", "")).split(";", Qt::SkipEmptyParts);
@@ -767,6 +769,15 @@ QString RS_System::symbolToLanguage(const QString& symb) {
         }
     }
     return ret;
+}
+
+QString RS_System::systemUiLanguage() const {
+    for (const auto& preferred : QLocale::system().uiLanguages()) {
+        const auto match = matchLanguage(m_languageList, preferred);
+        if (!match.isEmpty())
+            return match;
+    }
+    return QStringLiteral("en");
 }
 
 /**

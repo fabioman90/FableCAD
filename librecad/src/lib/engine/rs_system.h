@@ -150,6 +150,8 @@ public:
         return m_languageList;
     }
 
+    QString systemUiLanguage() const;
+
     static QString languageToSymbol(const QString& lang);
     static QString symbolToLanguage(const QString& symb);
     // Return the entry of languages that stands for lang, empty when none does.

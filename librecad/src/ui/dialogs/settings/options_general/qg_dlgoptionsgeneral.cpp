@@ -187,7 +187,7 @@ void QG_DlgOptionsGeneral::init(){
             }
             return combo->findData(match);
         };
-        QString lang = LC_GET_STR("Language", def_lang);
+        QString lang = LC_GET_STR("Language", RS_SYSTEM->systemUiLanguage());
         cbLanguage->setCurrentIndex(languageIndex(cbLanguage, lang));
 
         m_initialLanguageGUIIdx = cbLanguage->currentIndex();

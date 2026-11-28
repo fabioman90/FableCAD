@@ -219,7 +219,7 @@ void loadTranslations() {
     RS_DEBUG->print("main: loading translation..");
 
     LC_GROUP("Appearance");
-    const QString lang = LC_GET_STR("Language", "en");
+    const QString lang = LC_GET_STR("Language", RS_SYSTEM->systemUiLanguage());
     const QString langCmd = LC_GET_STR("LanguageCmd", "en");
     LC_GROUP_END();
 
@@ -496,7 +496,10 @@ int main(int argc, char** argv) {
         }
     }
     initSystem(argv, app);
+    loadTranslations();
     showFirstLoadSetupDialog(first_load);
+    if (first_load)
+        loadTranslations();
 
     std::unique_ptr<QSplashScreen> splash;
     const bool show_splash = LC_GET_ONE_BOOL("Startup","ShowSplash", false);
@@ -510,7 +513,6 @@ int main(int argc, char** argv) {
 
     initFontList();
     initPatternList();
-    loadTranslations();
 
     RS_DEBUG->print("main: creating main window..");
     QC_ApplicationWindow& appWin = *QC_ApplicationWindow::getAppWindow();

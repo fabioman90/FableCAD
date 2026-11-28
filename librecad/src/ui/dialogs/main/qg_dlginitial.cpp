@@ -60,13 +60,11 @@ void QG_DlgInitial::languageChange(){
 void QG_DlgInitial::init() const {
     // Fill combobox with languages:
     QStringList languageList = RS_SYSTEM->getLanguageList();
-    QStringList listed;
     for (const QString &language: std::as_const(languageList)) {
         QString l = RS_SYSTEM->symbolToLanguage(language);
         if (!l.isEmpty() && cbLanguage->findData(language) == -1) {
             cbLanguage->addItem(l, language);
             cbLanguageCmd->addItem(l, language);
-            listed << language;
         }
     }
 
@@ -80,19 +78,11 @@ void QG_DlgInitial::init() const {
 
     // The list holds canonical codes ("en_US" for librecad_en.qm), so select by
     // code: the GUI follows the user's preferred languages, commands stay English.
-    const QString english = RS_System::matchLanguage(listed, "en");
-    QString guiLanguage;
-    for (const QString& uiLanguage : QLocale().uiLanguages()) {
-        guiLanguage = RS_System::matchLanguage(listed, uiLanguage);
-        if (!guiLanguage.isEmpty()) {
-            break;
-        }
-    }
-    if (guiLanguage.isEmpty()) {
-        guiLanguage = english;
-    }
-    cbLanguage->setCurrentIndex( cbLanguage->findData(guiLanguage) );
-    cbLanguageCmd->setCurrentIndex( cbLanguageCmd->findData(english) );
+    const auto english = RS_System::matchLanguage(languageList, "en");
+    const auto guiLanguage = LC_GET_ONE_STR("Appearance", "Language", RS_SYSTEM->systemUiLanguage());
+    const auto commandLanguage = LC_GET_ONE_STR("Appearance", "LanguageCmd", english);
+    cbLanguage->setCurrentIndex(cbLanguage->findData(RS_System::matchLanguage(languageList, guiLanguage)));
+    cbLanguageCmd->setCurrentIndex(cbLanguageCmd->findData(RS_System::matchLanguage(languageList, commandLanguage)));
 }
 
 void QG_DlgInitial::setText(const QString& t) const {
